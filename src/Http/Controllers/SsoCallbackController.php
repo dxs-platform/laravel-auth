@@ -26,23 +26,51 @@ final class SsoCallbackController
         JwtVerifier $verifier,
         ProvisionsUsers $provisioner,
     ): Response {
-        if ($request->filled('error')) {
-            throw new SsoException('SSO authorization failed: '.$request->query('error'));
-        }
-
         $sessionState = $request->session()->pull('sso.state');
         $verifierCode = $request->session()->pull('sso.verifier');
+        $expectedNonce = $request->session()->pull('sso.nonce');
+        $expectedOrganizationContextId = $request->session()->pull('sso.organization_context_id');
         $return = $request->session()->pull('sso.return');
+        $callbackState = $request->query('state');
 
-        if (! is_string($sessionState) || ! hash_equals($sessionState, (string) $request->query('state'))) {
+        if (! is_string($sessionState) || ! is_string($callbackState) || ! hash_equals($sessionState, $callbackState)) {
             throw new SsoException('SSO state mismatch — possible CSRF or expired flow.');
         }
-        if (! $request->filled('code') || ! is_string($verifierCode)) {
-            throw new SsoException('SSO callback is missing the authorization code.');
+        if ($request->filled('error')) {
+            throw new SsoException('SSO authorization was denied by the identity provider.');
         }
 
-        $tokens = $exchanger->exchangeCode((string) $request->query('code'), $verifierCode);
+        $authorizationCode = $request->query('code');
+        if (! is_string($authorizationCode) || $authorizationCode === '' || ! is_string($verifierCode) || $verifierCode === '') {
+            throw new SsoException('SSO callback is missing the authorization code or PKCE verifier.');
+        }
+        if (! is_string($expectedNonce)
+            || $expectedNonce === ''
+            || ! is_string($expectedOrganizationContextId)
+            || $expectedOrganizationContextId === ''
+        ) {
+            throw new SsoException('SSO callback transaction is missing its nonce or organization context.');
+        }
+
+        $tokens = $exchanger->exchangeCode($authorizationCode, $verifierCode);
         $claims = $verifier->verify($tokens['access_token']);
+        $idToken = $tokens['id_token'] ?? null;
+        if ((! is_string($idToken) || $idToken === '') && $this->requestsOpenId()) {
+            throw new SsoException('SSO token response has no id_token.');
+        }
+
+        if (is_string($idToken) && $idToken !== '') {
+            $idClaims = $verifier->verifyIdToken($idToken, $expectedNonce);
+            if (! hash_equals((string) ($claims['sub'] ?? ''), (string) ($idClaims['sub'] ?? ''))) {
+                throw new SsoException('SSO access token and ID token subjects do not match.');
+            }
+        }
+        $tokenOrganizationContextId = $claims['organization_context_id'] ?? null;
+        if (! is_string($tokenOrganizationContextId)
+            || ! hash_equals($expectedOrganizationContextId, $tokenOrganizationContextId)
+        ) {
+            throw new SsoException('SSO token organization context does not match the selected organization.');
+        }
 
         $user = $provisioner->provision($claims, $tokens);
         Auth::login($user);
@@ -63,5 +91,10 @@ final class SsoCallbackController
 
         return redirect()->to(is_string($return) && $return !== '' ? $return : (string) config('sso.after_login'))
             ->withCookie($cookie);
+    }
+
+    private function requestsOpenId(): bool
+    {
+        return in_array('openid', preg_split('/\s+/', trim((string) config('sso.scopes'))) ?: [], true);
     }
 }

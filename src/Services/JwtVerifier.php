@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Dxs\Auth\Services;
 
+use Dxs\Auth\Exceptions\SsoException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
-use Dxs\Auth\Exceptions\SsoException;
 use Throwable;
 
 /**
@@ -20,6 +20,34 @@ final class JwtVerifier
     /** @return array<string, mixed> validated claims */
     public function verify(string $jwt): array
     {
+        return $this->verifyForAudience($jwt, (string) config('sso.service_slug'));
+    }
+
+    /** @return array<string, mixed> validated ID-token claims */
+    public function verifyIdToken(string $jwt, string $expectedNonce): array
+    {
+        $expectedAudience = (string) config('sso.service_slug');
+        $claims = $this->verifyForAudience($jwt, $expectedAudience);
+
+        $nonce = $claims['nonce'] ?? null;
+        if ($expectedNonce === '' || ! is_string($nonce) || ! hash_equals($expectedNonce, $nonce)) {
+            throw new SsoException('SSO ID token nonce mismatch.');
+        }
+
+        $audiences = is_array($claims['aud']) ? $claims['aud'] : [$claims['aud']];
+        $authorizedParty = $claims['azp'] ?? null;
+        if ((count($audiences) > 1 || $authorizedParty !== null)
+            && (! is_string($authorizedParty) || ! hash_equals($expectedAudience, $authorizedParty))
+        ) {
+            throw new SsoException('SSO ID token authorized party mismatch.');
+        }
+
+        return $claims;
+    }
+
+    /** @return array<string, mixed> */
+    private function verifyForAudience(string $jwt, string $expectedAudience): array
+    {
         JWT::$leeway = (int) config('sso.leeway');
 
         try {
@@ -29,18 +57,22 @@ final class JwtVerifier
             throw new SsoException('SSO token signature/expiry validation failed: '.$e->getMessage(), previous: $e);
         }
 
-        $expectedIss = rtrim((string) config('sso.issuer'), '/');
-        if (rtrim((string) ($claims['iss'] ?? ''), '/') !== $expectedIss) {
+        $expectedIssuer = rtrim((string) config('sso.issuer'), '/');
+        $issuer = $claims['iss'] ?? null;
+        if (! is_string($issuer) || rtrim($issuer, '/') !== $expectedIssuer) {
             throw new SsoException('SSO token issuer mismatch.');
         }
 
-        $aud = $claims['aud'] ?? null;
-        $audiences = is_array($aud) ? $aud : [$aud];
-        if (! in_array((string) config('sso.service_slug'), array_map('strval', $audiences), true)) {
+        $audience = $claims['aud'] ?? null;
+        $audiences = is_array($audience) ? array_values($audience) : [$audience];
+        if ($audiences === []
+            || array_filter($audiences, fn (mixed $value): bool => ! is_string($value)) !== []
+            || ! in_array($expectedAudience, $audiences, true)
+        ) {
             throw new SsoException('SSO token audience is not this service.');
         }
 
-        if (! isset($claims['sub']) || $claims['sub'] === '') {
+        if (! isset($claims['sub']) || ! is_string($claims['sub']) || $claims['sub'] === '') {
             throw new SsoException('SSO token has no subject.');
         }
 

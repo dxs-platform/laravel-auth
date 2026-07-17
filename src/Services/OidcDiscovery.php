@@ -26,7 +26,18 @@ final class OidcDiscovery
                 throw new SsoException("SSO discovery failed ({$response->status()}) from {$url}");
             }
 
-            return $response->json();
+            $document = $response->json();
+            if (! is_array($document)) {
+                throw new SsoException("SSO discovery returned an invalid document from {$url}");
+            }
+
+            $expectedIssuer = rtrim((string) config('sso.issuer'), '/');
+            $documentIssuer = $document['issuer'] ?? null;
+            if (! is_string($documentIssuer) || rtrim($documentIssuer, '/') !== $expectedIssuer) {
+                throw new SsoException('SSO discovery issuer does not match the configured issuer.');
+            }
+
+            return $document;
         });
     }
 
@@ -60,7 +71,12 @@ final class OidcDiscovery
                 throw new SsoException("SSO JWKS fetch failed ({$response->status()}).");
             }
 
-            return $response->json();
+            $jwks = $response->json();
+            if (! is_array($jwks) || ! isset($jwks['keys']) || ! is_array($jwks['keys']) || $jwks['keys'] === []) {
+                throw new SsoException('SSO JWKS response does not contain any signing keys.');
+            }
+
+            return $jwks;
         });
     }
 

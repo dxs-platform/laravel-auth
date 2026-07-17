@@ -58,6 +58,6 @@ final class AuthenticateSso
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        return redirect()->guest(route('sso.redirect', ['return' => $request->fullUrl()]));
+        return redirect()->guest(route('sso.redirect', ['return' => $request->getRequestUri()]));
     }
 }

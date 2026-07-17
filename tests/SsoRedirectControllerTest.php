@@ -8,6 +8,7 @@ use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\SsoClientServiceProvider;
 use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class SsoRedirectControllerTest extends TestCase
 {
@@ -34,6 +35,7 @@ final class SsoRedirectControllerTest extends TestCase
 
         Http::fake([
             'https://id.example.test/.well-known/openid-configuration' => Http::response([
+                'issuer' => 'https://id.example.test',
                 'authorization_endpoint' => 'https://id.example.test/sso/authorize',
                 'token_endpoint' => 'https://id.example.test/api/sso/token',
                 'jwks_uri' => 'https://id.example.test/.well-known/jwks.json',
@@ -72,13 +74,51 @@ final class SsoRedirectControllerTest extends TestCase
         $this->assertSame(self::ORGANIZATION_CONTEXT_ID, $query['organization_context_id']);
     }
 
-    public function test_missing_or_malformed_organization_context_fails_before_authorization(): void
+    #[DataProvider('invalidOrganizationContexts')]
+    public function test_missing_or_malformed_organization_context_fails_before_authorization(string $query): void
     {
         $this->withoutExceptionHandling();
 
         $this->expectException(SsoException::class);
         $this->expectExceptionMessage('A valid organization context is required');
 
-        $this->get('/auth/redirect?organization_context_id=not-a-uuid');
+        $this->get('/auth/redirect'.$query);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function invalidOrganizationContexts(): array
+    {
+        return [
+            'missing' => [''],
+            'malformed' => ['?organization_context_id=not-a-uuid'],
+            'array pollution' => ['?organization_context_id[]=9f79d9ee-d735-4673-a80d-c11339f252be'],
+        ];
+    }
+
+    #[DataProvider('unsafeReturnPaths')]
+    public function test_it_never_persists_an_unsafe_user_supplied_return_destination(string $returnPath): void
+    {
+        $response = $this->get('/auth/redirect?'.http_build_query([
+            'organization_context_id' => self::ORGANIZATION_CONTEXT_ID,
+            'return' => $returnPath,
+        ]));
+
+        $response->assertRedirect();
+        $response->assertSessionMissing('sso.return');
+    }
+
+    /** @return array<string, array{string}> */
+    public static function unsafeReturnPaths(): array
+    {
+        return [
+            'absolute HTTPS URL' => ['https://attacker.example/steal'],
+            'protocol-relative URL' => ['//attacker.example/steal'],
+            'backslash authority confusion' => ['/\\attacker.example/steal'],
+            'encoded protocol-relative URL' => ['/%2Fattacker.example/steal'],
+            'double encoded protocol-relative URL' => ['/%252Fattacker.example/steal'],
+            'encoded backslash authority confusion' => ['/%5Cattacker.example/steal'],
+            'CRLF header injection' => ["/safe\r\nLocation: https://attacker.example"],
+            'non-path value' => ['dashboard'],
+        ];
     }
 }

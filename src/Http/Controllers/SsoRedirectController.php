@@ -23,9 +23,10 @@ final class SsoRedirectController
         $state = Str::random(40);
         $nonce = Str::random(40);
         $configuredOrganizationContextId = (string) config('sso.organization_context_id', '');
+        $requestedOrganizationContextId = $request->query('organization_context_id');
         $organizationContextId = $configuredOrganizationContextId !== ''
             ? $configuredOrganizationContextId
-            : (string) $request->query('organization_context_id', '');
+            : (is_string($requestedOrganizationContextId) ? $requestedOrganizationContextId : '');
 
         if (! Str::isUuid($organizationContextId)) {
             throw new SsoException('A valid organization context is required to start SSO.');
@@ -35,8 +36,9 @@ final class SsoRedirectController
         $request->session()->put('sso.state', $state);
         $request->session()->put('sso.nonce', $nonce);
         $request->session()->put('sso.organization_context_id', $organizationContextId);
-        if ($request->filled('return')) {
-            $request->session()->put('sso.return', (string) $request->query('return'));
+        $returnPath = $this->safeReturnPath($request->query('return'));
+        if ($returnPath !== null) {
+            $request->session()->put('sso.return', $returnPath);
         }
 
         $query = http_build_query([
@@ -53,5 +55,42 @@ final class SsoRedirectController
         ]);
 
         return redirect()->away($discovery->authorizationEndpoint().'?'.$query);
+    }
+
+    private function safeReturnPath(mixed $returnPath): ?string
+    {
+        if (! is_string($returnPath) || ! $this->isLocalPath($returnPath)) {
+            return null;
+        }
+
+        $decodedPath = $returnPath;
+        for ($decodePass = 0; $decodePass < 2; $decodePass++) {
+            $decodedPath = rawurldecode($decodedPath);
+            if (! $this->isLocalPath($decodedPath)) {
+                return null;
+            }
+        }
+
+        return $returnPath;
+    }
+
+    private function isLocalPath(string $path): bool
+    {
+        if ($path === ''
+            || ! str_starts_with($path, '/')
+            || str_starts_with($path, '//')
+            || str_contains($path, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $path) === 1
+        ) {
+            return false;
+        }
+
+        $parts = parse_url($path);
+
+        return $parts !== false
+            && ! isset($parts['scheme'])
+            && ! isset($parts['host'])
+            && ! isset($parts['user'])
+            && ! isset($parts['pass']);
     }
 }

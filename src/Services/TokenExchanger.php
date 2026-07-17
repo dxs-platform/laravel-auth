@@ -58,7 +58,7 @@ final class TokenExchanger
 
         $data = $response->json();
 
-        if (! isset($data['access_token'])) {
+        if (! is_array($data) || ! isset($data['access_token']) || ! is_string($data['access_token']) || $data['access_token'] === '') {
             throw new SsoException('SSO token response has no access_token.');
         }
 
