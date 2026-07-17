@@ -6,9 +6,11 @@ namespace Dxs\Auth\Tests;
 
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Services\JwtVerifier;
+use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\SsoClientServiceProvider;
 use Dxs\Auth\Tests\Support\JwtFactory;
 use Firebase\JWT\JWT;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase;
@@ -89,6 +91,62 @@ final class JwtVerifierTest extends TestCase
         $this->expectExceptionMessage('signature/expiry validation failed');
 
         $this->app->make(JwtVerifier::class)->verify($this->jwt->token([], 'unknown-key'));
+    }
+
+    public function test_it_refreshes_jwks_once_when_a_rotated_key_id_is_seen(): void
+    {
+        $rotated = new JwtFactory('rotated-key');
+        $jwksRequests = 0;
+
+        Http::swap(new Factory);
+        Http::fake(function ($request) use ($rotated, &$jwksRequests) {
+            if (str_ends_with($request->url(), '/.well-known/openid-configuration')) {
+                return Http::response([
+                    'issuer' => 'https://id.example.test',
+                    'authorization_endpoint' => 'https://id.example.test/sso/authorize',
+                    'token_endpoint' => 'https://id.example.test/api/sso/token',
+                    'jwks_uri' => 'https://id.example.test/.well-known/jwks.json',
+                ]);
+            }
+
+            $jwksRequests++;
+
+            return Http::response($jwksRequests === 1 ? $this->jwt->jwks() : $rotated->jwks());
+        });
+
+        $this->app->make(OidcDiscovery::class)->jwks();
+        $claims = $this->app->make(JwtVerifier::class)->verify($rotated->token());
+
+        $this->assertSame('user-1', $claims['sub']);
+        $this->assertSame(2, $jwksRequests);
+    }
+
+    public function test_it_bounds_unknown_key_refresh_to_one_request(): void
+    {
+        $jwksRequests = 0;
+
+        Http::swap(new Factory);
+        Http::fake(function ($request) use (&$jwksRequests) {
+            if (str_ends_with($request->url(), '/.well-known/openid-configuration')) {
+                return Http::response([
+                    'issuer' => 'https://id.example.test',
+                    'authorization_endpoint' => 'https://id.example.test/sso/authorize',
+                    'token_endpoint' => 'https://id.example.test/api/sso/token',
+                    'jwks_uri' => 'https://id.example.test/.well-known/jwks.json',
+                ]);
+            }
+
+            $jwksRequests++;
+
+            return Http::response($this->jwt->jwks());
+        });
+
+        try {
+            $this->app->make(JwtVerifier::class)->verify($this->jwt->token([], 'never-published'));
+            $this->fail('Expected unknown signing key to fail.');
+        } catch (SsoException) {
+            $this->assertSame(2, $jwksRequests);
+        }
     }
 
     public function test_it_rejects_algorithm_confusion_against_an_rsa_jwks(): void

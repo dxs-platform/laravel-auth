@@ -51,7 +51,14 @@ final class JwtVerifier
         JWT::$leeway = (int) config('sso.leeway');
 
         try {
-            $keys = JWK::parseKeySet($this->discovery->jwks());
+            $jwks = $this->discovery->jwks();
+            $keyId = $this->keyId($jwt);
+
+            if ($keyId !== null && ! $this->containsKeyId($jwks, $keyId)) {
+                $jwks = $this->discovery->jwks(fresh: true);
+            }
+
+            $keys = JWK::parseKeySet($jwks);
             $claims = (array) JWT::decode($jwt, $keys); // validates signature + exp/nbf/iat
         } catch (Throwable $e) {
             throw new SsoException('SSO token signature/expiry validation failed: '.$e->getMessage(), previous: $e);
@@ -77,5 +84,30 @@ final class JwtVerifier
         }
 
         return $claims;
+    }
+
+    private function keyId(string $jwt): ?string
+    {
+        $segments = explode('.', $jwt);
+        if (count($segments) !== 3) {
+            return null;
+        }
+
+        $header = json_decode(JWT::urlsafeB64Decode($segments[0]), true);
+        $keyId = is_array($header) ? ($header['kid'] ?? null) : null;
+
+        return is_string($keyId) && $keyId !== '' ? $keyId : null;
+    }
+
+    /** @param array<string, mixed> $jwks */
+    private function containsKeyId(array $jwks, string $keyId): bool
+    {
+        foreach ($jwks['keys'] ?? [] as $key) {
+            if (is_array($key) && ($key['kid'] ?? null) === $keyId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

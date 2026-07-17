@@ -18,7 +18,7 @@ final class OidcDiscovery
     /** @return array<string, mixed> */
     public function document(): array
     {
-        return Cache::remember('sso:discovery', (int) config('sso.discovery_ttl'), function (): array {
+        return Cache::remember($this->cacheKey('discovery'), (int) config('sso.discovery_ttl'), function (): array {
             $url = rtrim((string) config('sso.issuer'), '/').'/.well-known/openid-configuration';
             $response = Http::timeout((int) config('sso.http_timeout'))->acceptJson()->get($url);
 
@@ -62,9 +62,15 @@ final class OidcDiscovery
     }
 
     /** @return array<string, mixed> raw JWKS (`{ keys: [...] }`) */
-    public function jwks(): array
+    public function jwks(bool $fresh = false): array
     {
-        return Cache::remember('sso:jwks', (int) config('sso.discovery_ttl'), function (): array {
+        $cacheKey = $this->cacheKey('jwks');
+
+        if ($fresh) {
+            Cache::forget($cacheKey);
+        }
+
+        return Cache::remember($cacheKey, (int) config('sso.discovery_ttl'), function (): array {
             $response = Http::timeout((int) config('sso.http_timeout'))->acceptJson()->get($this->jwksUri());
 
             if ($response->failed()) {
@@ -89,5 +95,12 @@ final class OidcDiscovery
         }
 
         return $value;
+    }
+
+    private function cacheKey(string $resource): string
+    {
+        $issuer = rtrim((string) config('sso.issuer'), '/');
+
+        return 'sso:'.hash('sha256', $issuer).':'.$resource;
     }
 }

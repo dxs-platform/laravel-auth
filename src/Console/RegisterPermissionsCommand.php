@@ -36,6 +36,13 @@ final class RegisterPermissionsCommand extends Command
             return self::SUCCESS;
         }
 
+        $validationError = $this->validationError($manifest);
+        if ($validationError !== null) {
+            $this->error($validationError);
+
+            return self::FAILURE;
+        }
+
         $this->line('Registering '.count($manifest['permissions']).' permission code(s) for service ['.(string) config('sso.service_slug').']');
 
         if ($this->option('dry-run')) {
@@ -51,8 +58,12 @@ final class RegisterPermissionsCommand extends Command
             return self::FAILURE;
         }
 
-        $service = (string) config('sso.service_id', config('sso.service_slug'));
-        $url = rtrim((string) config('sso.issuer'), '/')."/api/admin/services/{$service}/authz";
+        $service = (string) config('sso.service_id');
+        if ($service === '') {
+            $service = (string) config('sso.service_slug');
+        }
+
+        $url = rtrim((string) config('sso.issuer'), '/').'/api/admin/services/'.rawurlencode($service).'/authz';
 
         $response = Http::withToken($token)
             ->timeout((int) config('sso.http_timeout'))
@@ -60,7 +71,7 @@ final class RegisterPermissionsCommand extends Command
             ->put($url, $manifest);
 
         if ($response->failed()) {
-            $this->error("Registration failed ({$response->status()}): ".$response->body());
+            $this->error("Registration failed ({$response->status()}).");
 
             throw new SsoException('Permission registration failed.');
         }
@@ -68,5 +79,48 @@ final class RegisterPermissionsCommand extends Command
         $this->info('Permission catalog registered.');
 
         return self::SUCCESS;
+    }
+
+    /** @param array<string, mixed> $manifest */
+    private function validationError(array $manifest): ?string
+    {
+        $permissions = $manifest['permissions'] ?? null;
+        if (! is_array($permissions)) {
+            return 'Permission manifest must contain a permissions array.';
+        }
+
+        $codes = [];
+        foreach ($permissions as $index => $permission) {
+            $code = is_array($permission) ? ($permission['code'] ?? null) : null;
+            if (! is_string($code) || trim($code) === '') {
+                return "Permission at index {$index} must have a non-empty string code.";
+            }
+
+            if (isset($codes[$code])) {
+                return "Permission code [{$code}] is duplicated.";
+            }
+
+            $codes[$code] = true;
+        }
+
+        $roles = $manifest['roles'] ?? [];
+        if (! is_array($roles)) {
+            return 'Permission manifest roles must be an array.';
+        }
+
+        foreach ($roles as $index => $role) {
+            $rolePermissions = is_array($role) ? ($role['permissions'] ?? null) : null;
+            if (! is_array($rolePermissions)) {
+                return "Role at index {$index} must contain a permissions array.";
+            }
+
+            foreach ($rolePermissions as $permissionCode) {
+                if (! is_string($permissionCode) || ! isset($codes[$permissionCode])) {
+                    return "Role at index {$index} references an unknown permission.";
+                }
+            }
+        }
+
+        return null;
     }
 }

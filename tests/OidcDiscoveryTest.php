@@ -107,6 +107,36 @@ final class OidcDiscoveryTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_it_isolates_discovery_and_jwks_cache_by_issuer(): void
+    {
+        Http::fake(function ($request) {
+            $issuer = str_contains($request->url(), 'id-b.example.test')
+                ? 'https://id-b.example.test'
+                : 'https://id.example.test';
+
+            if (str_ends_with($request->url(), '/.well-known/openid-configuration')) {
+                return Http::response([
+                    'issuer' => $issuer,
+                    'authorization_endpoint' => $issuer.'/sso/authorize',
+                    'token_endpoint' => $issuer.'/api/sso/token',
+                    'jwks_uri' => $issuer.'/.well-known/jwks.json',
+                ]);
+            }
+
+            return Http::response(['keys' => [['kty' => 'RSA', 'kid' => $issuer]]]);
+        });
+
+        $discovery = $this->app->make(OidcDiscovery::class);
+        $this->assertSame('https://id.example.test/sso/authorize', $discovery->authorizationEndpoint());
+        $this->assertSame('https://id.example.test', $discovery->jwks()['keys'][0]['kid']);
+
+        config()->set('sso.issuer', 'https://id-b.example.test');
+
+        $this->assertSame('https://id-b.example.test/sso/authorize', $discovery->authorizationEndpoint());
+        $this->assertSame('https://id-b.example.test', $discovery->jwks()['keys'][0]['kid']);
+        Http::assertSentCount(4);
+    }
+
     /** @param array<string, mixed> $overrides */
     private function document(array $overrides = []): array
     {

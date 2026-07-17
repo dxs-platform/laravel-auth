@@ -8,14 +8,14 @@ use Firebase\JWT\JWT;
 
 final class JwtFactory
 {
-    private const KEY_ID = 'package-test-key';
+    private const DEFAULT_KEY_ID = 'package-test-key';
 
     private string $privateKey;
 
     /** @var array<string, mixed> */
     private array $jwk;
 
-    public function __construct()
+    public function __construct(private readonly string $keyId = self::DEFAULT_KEY_ID)
     {
         $key = openssl_pkey_new([
             'digest_alg' => 'sha256',
@@ -35,7 +35,7 @@ final class JwtFactory
         $this->privateKey = $privateKey;
         $this->jwk = [
             'kty' => 'RSA',
-            'kid' => self::KEY_ID,
+            'kid' => $this->keyId,
             'use' => 'sig',
             'alg' => 'RS256',
             'n' => $this->base64Url($details['rsa']['n']),
@@ -44,7 +44,7 @@ final class JwtFactory
     }
 
     /** @param array<string, mixed> $claims */
-    public function token(array $claims = [], ?string $keyId = self::KEY_ID): string
+    public function token(array $claims = [], ?string $keyId = null): string
     {
         $now = time();
 
@@ -55,7 +55,7 @@ final class JwtFactory
             'iat' => $now,
             'nbf' => $now - 1,
             'exp' => $now + 300,
-        ], $claims), $this->privateKey, 'RS256', $keyId);
+        ], $claims), $this->privateKey, 'RS256', $keyId ?? $this->keyId);
     }
 
     /** @return array{keys: array<int, array<string, mixed>>} */
