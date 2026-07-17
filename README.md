@@ -23,6 +23,35 @@ a fallback named `login` route, and a zero-config JIT provisioner
 registered by the package. Publish an app-owned provisioner only when the
 mapping needs custom behaviour: `sso:install --provisioner`.
 
+## Reading the current user's authorization
+
+The `Sso` facade exposes the platform-resolved picture Gate can't (it only
+answers yes/no). Every read reuses the same cache the Gate uses:
+
+```php
+use Dxs\Auth\Facades\Sso;
+
+Sso::user();                       // the authenticated user (or null)
+Sso::permissions();                // Collection<string> of platform permission slugs
+Sso::roles();                      // list of platform roles (slug/display_name/level)
+Sso::can('branches.view');         // bool
+Sso::canAll('a', 'b');  Sso::canAny('a', 'b');
+Sso::hasRole('manager');
+```
+
+Share it to an Inertia/React frontend in one line:
+
+```php
+Inertia::share('permissions', fn () => Sso::permissions());
+```
+
+## Lifecycle events
+
+- `Dxs\Auth\Events\SsoAuthenticated($user, $claims, $firstLogin)` — after a
+  successful callback + login (`$firstLogin` true when the local record was
+  just created). Hook it for audit trails, welcome emails, last-login stamps.
+- `Dxs\Auth\Events\SsoLoggedOut($user)` — before the session is torn down.
+
 ## Protecting resource routes
 
 One alias authenticates the platform bearer AND requires abilities, with

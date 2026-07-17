@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Http\Controllers;
 
 use Dxs\Auth\Contracts\ProvisionsUsers;
+use Dxs\Auth\Events\SsoAuthenticated;
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\LogoutSessionRegistry;
@@ -87,8 +88,10 @@ final class SsoCallbackController
 
         $this->assertOrganizationClaim($claims, $expectedOrganizationContextId);
 
+        $firstLogin = $provisioner->resolveBySubject((string) ($claims['sub'] ?? '')) === null;
         $user = $provisioner->provision($claims, $tokens);
         Auth::login($user);
+        SsoAuthenticated::dispatch($user, $claims, $firstLogin);
         $request->session()->regenerate();
         $logoutSessions->register($claims, $tokens['access_token'], $request->session()->getId());
 

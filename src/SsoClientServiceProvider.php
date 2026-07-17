@@ -31,6 +31,7 @@ final class SsoClientServiceProvider extends ServiceProvider
         $this->app->singleton(LogoutSessionRegistry::class);
         $this->app->singleton(TokenExchanger::class);
         $this->app->singleton(PermissionClient::class);
+        $this->app->singleton(\Dxs\Auth\SsoManager::class);
     }
 
     public function boot(Router $router): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dxs\Auth\Http\Controllers;
 
+use Dxs\Auth\Events\SsoLoggedOut;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
 use Illuminate\Http\Request;
@@ -23,6 +24,8 @@ final class SsoLogoutController
         if (is_string($bearer) && $bearer !== '') {
             PermissionClient::forgetForTokenHash(hash('sha256', $bearer));
         }
+
+        SsoLoggedOut::dispatch(Auth::user());
 
         Auth::logout();
         $request->session()->invalidate();
