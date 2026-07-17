@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Sso;
+
+use App\Models\User;
+use Dxs\Auth\Contracts\ProvisionsUsers;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Carbon;
+
+/**
+ * App-owned JIT provisioner (published from dxs/laravel-auth). The package's
+ * DatabaseUserProvisioner already does exactly this — publish and customise
+ * only when your mapping needs app-specific behaviour (extra columns,
+ * domain events, invitation checks, …). Remember to bind it:
+ *
+ *     $this->app->singleton(ProvisionsUsers::class, UserProvisioner::class);
+ */
+final class UserProvisioner implements ProvisionsUsers
+{
+    public function provision(array $claims, array $tokens): Authenticatable
+    {
+        $subject = (string) $claims['sub'];
+
+        $user = User::query()->where('console_user_id', $subject)->first() ?? new User;
+
+        $user->forceFill(array_filter([
+            'console_user_id' => $subject,
+            'name' => $claims['name'] ?? $user->name ?? '',
+            'email' => $claims['email'] ?? $user->email ?? '',
+            'console_organization_id' => $claims['organization_id'] ?? $user->console_organization_id,
+            'console_access_token' => $tokens['access_token'] ?? null,
+            'console_refresh_token' => $tokens['refresh_token'] ?? $user->console_refresh_token,
+            'console_token_expires_at' => isset($tokens['expires_in'])
+                ? Carbon::now()->addSeconds((int) $tokens['expires_in'])
+                : $user->console_token_expires_at,
+        ], static fn ($value): bool => $value !== null));
+
+        $user->save();
+
+        return $user;
+    }
+
+    public function resolveBySubject(string $subject): ?Authenticatable
+    {
+        return User::query()->where('console_user_id', $subject)->first();
+    }
+}

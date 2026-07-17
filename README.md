@@ -12,8 +12,16 @@ permission list and answers `Gate` from it. The service only declares its permis
 ## Install
 
 ```bash
-composer require dxs/laravel-auth:^0.4
+composer require dxs/laravel-auth:^0.8
+php artisan sso:install   # publishes config + users-table migration + authz catalog
+php artisan migrate
 ```
+
+Set the `SSO_*` env values and you are done: routes (`/auth/redirect|callback|logout`),
+a fallback named `login` route, and a zero-config JIT provisioner
+(`DatabaseUserProvisioner`, writing your `auth.providers.users.model`) are all
+registered by the package. Publish an app-owned provisioner only when the
+mapping needs custom behaviour: `sso:install --provisioner`.
 
 ## Protecting resource routes
 

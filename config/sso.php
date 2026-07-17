@@ -123,9 +123,21 @@ return [
     | The package registers GET /auth/redirect, GET /auth/callback,
     | POST /auth/logout under this prefix + middleware group.
     */
+    /*
+     * The default JIT provisioner writes to this model (falls back to
+     * auth.providers.users.model). Bind your own ProvisionsUsers
+     * implementation to take over completely.
+     */
+    'provisioner' => [
+        'model' => env('SSO_PROVISIONER_MODEL'),
+    ],
+
     'routes' => [
         'enabled' => env('SSO_ROUTES_ENABLED', true),
         'prefix' => env('SSO_ROUTES_PREFIX', 'auth'),
+        // Register a named `login` route redirecting into /auth/redirect
+        // when the app does not define one itself.
+        'login_redirect' => (bool) env('SSO_LOGIN_REDIRECT', true),
         'middleware' => ['web'],
     ],
 ];
