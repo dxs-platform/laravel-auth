@@ -3,3 +3,9 @@ composer.lock
 .phpunit.result.cache
 /.phpunit.cache/
 .DS_Store
+/tests/e2e/artifacts/
+/tests/e2e/node_modules/
+/tests/e2e/fixtures/*/.env
+/tests/e2e/fixtures/*/vendor/
+/tests/e2e/fixtures/*/storage/
+/tests/e2e/fixtures/*/bootstrap/cache/

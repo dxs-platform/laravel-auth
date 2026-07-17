@@ -60,8 +60,8 @@ final class SsoRedirectControllerTest extends TestCase
         $this->assertNotSame('', $query['state']);
         $this->assertNotSame('', $query['nonce']);
         $this->assertNotSame('', $query['code_challenge']);
-        $response->assertSessionHas('sso.organization_context_id', self::ORGANIZATION_CONTEXT_ID);
-        $response->assertSessionHas('sso.return', '/protected');
+        $response->assertSessionHas("sso.transactions.{$query['state']}.organization_context_id", self::ORGANIZATION_CONTEXT_ID);
+        $response->assertSessionHas("sso.transactions.{$query['state']}.return", '/protected');
     }
 
     public function test_fixed_single_tenant_context_cannot_be_overridden_by_the_request(): void

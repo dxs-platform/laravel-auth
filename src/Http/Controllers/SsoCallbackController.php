@@ -26,16 +26,19 @@ final class SsoCallbackController
         JwtVerifier $verifier,
         ProvisionsUsers $provisioner,
     ): Response {
-        $sessionState = $request->session()->pull('sso.state');
-        $verifierCode = $request->session()->pull('sso.verifier');
-        $expectedNonce = $request->session()->pull('sso.nonce');
-        $expectedOrganizationContextId = $request->session()->pull('sso.organization_context_id');
-        $return = $request->session()->pull('sso.return');
         $callbackState = $request->query('state');
+        $transaction = is_string($callbackState) && $callbackState !== ''
+            ? $request->session()->pull("sso.transactions.{$callbackState}")
+            : null;
 
-        if (! is_string($sessionState) || ! is_string($callbackState) || ! hash_equals($sessionState, $callbackState)) {
+        if (! is_array($transaction)) {
             throw new SsoException('SSO state mismatch — possible CSRF or expired flow.');
         }
+        $verifierCode = $transaction['verifier'] ?? null;
+        $expectedNonce = $transaction['nonce'] ?? null;
+        $expectedOrganizationContextId = $transaction['organization_context_id'] ?? null;
+        $return = $transaction['return'] ?? null;
+
         if ($request->filled('error')) {
             throw new SsoException('SSO authorization was denied by the identity provider.');
         }

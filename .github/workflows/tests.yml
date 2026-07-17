@@ -29,3 +29,29 @@ jobs:
       - run: composer validate --strict
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: composer test
+
+  browser-e2e:
+    name: Two-consumer browser E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: ./tests/e2e/run.sh
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-evidence
+          path: tests/e2e/artifacts/
+          retention-days: 14

@@ -32,14 +32,14 @@ final class SsoRedirectController
             throw new SsoException('A valid organization context is required to start SSO.');
         }
 
-        $request->session()->put('sso.verifier', $pkce['verifier']);
-        $request->session()->put('sso.state', $state);
-        $request->session()->put('sso.nonce', $nonce);
-        $request->session()->put('sso.organization_context_id', $organizationContextId);
         $returnPath = $this->safeReturnPath($request->query('return'));
-        if ($returnPath !== null) {
-            $request->session()->put('sso.return', $returnPath);
-        }
+        $request->session()->put("sso.transactions.{$state}", [
+            'verifier' => $pkce['verifier'],
+            'nonce' => $nonce,
+            'organization_context_id' => $organizationContextId,
+            'return' => $returnPath,
+            'created_at' => now()->timestamp,
+        ]);
 
         $query = http_build_query([
             'service_slug' => config('sso.service_slug'),
