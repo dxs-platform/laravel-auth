@@ -36,6 +36,11 @@ final class SsoCallbackController
         if (! is_array($transaction)) {
             throw new SsoException('SSO state mismatch — possible CSRF or expired flow.');
         }
+
+        $ttl = (int) config('sso.transaction_ttl', 600);
+        if ((int) ($transaction['created_at'] ?? 0) < now()->timestamp - $ttl) {
+            throw new SsoException('SSO sign-in took too long — please try again.');
+        }
         $verifierCode = $transaction['verifier'] ?? null;
         $expectedNonce = $transaction['nonce'] ?? null;
         $expectedOrganizationContextId = $transaction['organization_context_id'] ?? null;

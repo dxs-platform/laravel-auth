@@ -59,8 +59,12 @@ final class SsoLogoutControllerTest extends TestCase
     {
         $this->fakeDiscovery(endSession: 'https://id.example.test/sso/logout');
 
-        $this->post('/auth/logout')
-            ->assertRedirect('https://id.example.test/sso/logout');
+        $response = $this->post('/auth/logout');
+
+        $location = (string) $response->headers->get('Location');
+
+        $this->assertStringStartsWith('https://id.example.test/sso/logout?', $location);
+        $this->assertStringContainsString('post_logout_redirect_uri=', $location);
     }
 
     public function test_logout_falls_back_to_the_local_destination_without_an_end_session_endpoint(): void

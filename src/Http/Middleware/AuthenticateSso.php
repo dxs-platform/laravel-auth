@@ -88,7 +88,15 @@ final class AuthenticateSso
     private function unauthenticated(Request $request): Response
     {
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            // RFC 6750 §3 — a 401 to a protected resource MUST carry a
+            // WWW-Authenticate challenge; `invalid_token` only when a token
+            // was actually presented (a bare challenge otherwise).
+            $challenge = $request->bearerToken()
+                ? 'Bearer realm="sso", error="invalid_token"'
+                : 'Bearer realm="sso"';
+
+            return response()->json(['message' => 'Unauthenticated.'], 401)
+                ->header('WWW-Authenticate', $challenge);
         }
 
         return redirect()->guest(route('sso.redirect', ['return' => $request->getRequestUri()]));

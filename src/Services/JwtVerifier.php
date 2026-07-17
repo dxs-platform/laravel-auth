@@ -21,6 +21,8 @@ final class JwtVerifier
     /** @return array<string, mixed> validated claims */
     public function verify(string $jwt): array
     {
+        $this->assertAccessTokenType($jwt);
+
         return $this->verifyForAudience($jwt, (string) config('sso.service_slug'));
     }
 
@@ -118,7 +120,24 @@ final class JwtVerifier
         return $claims;
     }
 
-    private function keyId(string $jwt): ?string
+    /**
+     * RFC 9068 §4 — a JWT access token MUST carry `typ: at+jwt` (compared
+     * case-insensitively); reject every other media type so an ID token or a
+     * logout token can never be replayed as an access token. Applies only to
+     * the access-token path — ID and logout tokens keep their own types.
+     */
+    private function assertAccessTokenType(string $jwt): void
+    {
+        $header = $this->header($jwt);
+        $type = is_array($header) ? ($header['typ'] ?? null) : null;
+
+        if (! is_string($type) || strcasecmp($type, 'at+jwt') !== 0) {
+            throw new SsoException('SSO access token is not an RFC 9068 at+jwt token.');
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function header(string $jwt): ?array
     {
         $segments = explode('.', $jwt);
         if (count($segments) !== 3) {
@@ -126,7 +145,13 @@ final class JwtVerifier
         }
 
         $header = json_decode(JWT::urlsafeB64Decode($segments[0]), true);
-        $keyId = is_array($header) ? ($header['kid'] ?? null) : null;
+
+        return is_array($header) ? $header : null;
+    }
+
+    private function keyId(string $jwt): ?string
+    {
+        $keyId = $this->header($jwt)['kid'] ?? null;
 
         return is_string($keyId) && $keyId !== '' ? $keyId : null;
     }
