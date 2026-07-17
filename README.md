@@ -12,7 +12,7 @@ permission list and answers `Gate` from it. The service only declares its permis
 ## Install
 
 ```bash
-composer require dxs/laravel-auth
+composer require dxs/laravel-auth:^0.2
 ```
 
 The service provider auto-discovers. Publish config if you want to tweak it:
@@ -60,6 +60,7 @@ provided.
 | `GET {prefix}/redirect` | Start Authorization Code + PKCE (S256) |
 | `GET {prefix}/callback`  | Verify state/nonce, exchange code, provision user, set `token` cookie |
 | `POST {prefix}/logout`   | Clear the session cookie |
+| `POST {prefix}/backchannel-logout` | Validate an OIDC logout token and revoke its local session lineage |
 | `sso.auth` middleware    | Validate a platform-issued bearer (JWKS/`aud`/`exp`) and resolve the local user |
 | `Gate::before`           | Grant an ability iff it is in the platform-resolved permission list |
 | `dxs-auth:register-permissions` | Push this service's declared permission catalog to the platform |

@@ -7,6 +7,7 @@ namespace Dxs\Auth;
 use Dxs\Auth\Console\RegisterPermissionsCommand;
 use Dxs\Auth\Http\Middleware\AuthenticateSso;
 use Dxs\Auth\Services\JwtVerifier;
+use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
 use Dxs\Auth\Services\TokenExchanger;
@@ -23,6 +24,7 @@ final class SsoClientServiceProvider extends ServiceProvider
 
         $this->app->singleton(OidcDiscovery::class);
         $this->app->singleton(JwtVerifier::class);
+        $this->app->singleton(LogoutSessionRegistry::class);
         $this->app->singleton(TokenExchanger::class);
         $this->app->singleton(PermissionClient::class);
     }

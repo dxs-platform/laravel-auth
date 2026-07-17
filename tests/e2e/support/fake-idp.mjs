@@ -10,6 +10,7 @@ const clients = new Map([
 ]);
 const transactions = new Map();
 const codes = new Map();
+const activeSessions = new Map();
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwk = publicKey.export({ format: 'jwk' });
 jwk.alg = 'RS256';
@@ -84,8 +85,10 @@ export async function startFakeIdp() {
       }
       codes.delete(form.get('code'));
       const now = Math.floor(Date.now() / 1000);
+      const sid = `e2e-${client.slug}-${randomBytes(12).toString('hex')}`;
+      activeSessions.set(client.slug, sid);
       return sendJson(response, 200, {
-        access_token: jwt({ iss: issuer, aud: client.slug, sub: 'e2e-user', iat: now, exp: now + 900, organization_context_id: grant.tokenOrganization }),
+        access_token: jwt({ iss: issuer, aud: client.slug, sub: 'e2e-user', sid, iat: now, exp: now + 900, organization_context_id: grant.tokenOrganization }),
         id_token: jwt({ iss: issuer, aud: client.slug, sub: 'e2e-user', iat: now, exp: now + 900, nonce: grant.nonce }),
         token_type: 'Bearer',
         expires_in: 900,
@@ -104,5 +107,35 @@ export async function startFakeIdp() {
     response.writeHead(404).end();
   });
   await new Promise((resolve) => server.listen(9400, '127.0.0.1', resolve));
-  return { close: () => new Promise((resolve) => server.close(resolve)), organizationA, organizationB };
+  return {
+    close: () => new Promise((resolve) => server.close(resolve)),
+    organizationA,
+    organizationB,
+    async deliverBackChannelLogout() {
+      const now = Math.floor(Date.now() / 1000);
+      const targets = [
+        ['consumer-a', 'consumer-a-client', 'http://downstream-a.localhost:9401/auth/backchannel-logout'],
+        ['consumer-b', 'consumer-b-client', 'http://downstream-b.localhost:9402/auth/backchannel-logout'],
+      ];
+
+      return Promise.all(targets.map(async ([service, audience, endpoint]) => {
+        const logoutToken = jwt({
+          iss: issuer,
+          aud: audience,
+          sub: 'e2e-user',
+          sid: activeSessions.get(service),
+          jti: randomBytes(16).toString('hex'),
+          iat: now,
+          exp: now + 120,
+          events: { 'http://schemas.openid.net/event/backchannel-logout': {} },
+        });
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ logout_token: logoutToken }),
+        });
+        return { audience: service, status: response.status };
+      }));
+    },
+  };
 }

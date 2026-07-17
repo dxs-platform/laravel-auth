@@ -108,3 +108,23 @@ test('wrong state, callback replay, and organization-claim substitution fail clo
   expect(tampered[0].status()).toBe(500);
   await expect(page.getByText(/organization context (does not match|mismatch)/i)).toBeVisible();
 });
+
+test('IdP back-channel logout reaches both running consumers and revokes both browser sessions', async ({ context }) => {
+  const consumerAPage = await context.newPage();
+  const consumerBPage = await context.newPage();
+  await login(consumerAPage, 'http://downstream-a.localhost:9401', 'consumer-a');
+  await login(consumerBPage, 'http://downstream-b.localhost:9402', 'consumer-b', idp.organizationB);
+
+  expect(await idp.deliverBackChannelLogout()).toEqual([
+    { audience: 'consumer-a', status: 200 },
+    { audience: 'consumer-b', status: 200 },
+  ]);
+
+  const protectedStatus = (page, origin) => page.evaluate(async (url) => {
+    const response = await fetch(url, { headers: { accept: 'application/json' } });
+    return response.status;
+  }, `${origin}/protected`);
+
+  expect(await protectedStatus(consumerAPage, 'http://downstream-a.localhost:9401')).toBe(401);
+  expect(await protectedStatus(consumerBPage, 'http://downstream-b.localhost:9402')).toBe(401);
+});

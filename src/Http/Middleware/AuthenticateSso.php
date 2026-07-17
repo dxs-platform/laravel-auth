@@ -8,6 +8,7 @@ use Closure;
 use Dxs\Auth\Contracts\ProvisionsUsers;
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Services\JwtVerifier;
+use Dxs\Auth\Services\LogoutSessionRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,6 +25,7 @@ final class AuthenticateSso
     public function __construct(
         private readonly JwtVerifier $verifier,
         private readonly ProvisionsUsers $provisioner,
+        private readonly LogoutSessionRegistry $logoutSessions,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -31,6 +33,10 @@ final class AuthenticateSso
         $token = $request->bearerToken();
 
         if (! is_string($token) || $token === '') {
+            return $this->unauthenticated($request);
+        }
+
+        if ($this->logoutSessions->tokenIsRevoked($token)) {
             return $this->unauthenticated($request);
         }
 

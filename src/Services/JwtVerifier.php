@@ -7,6 +7,7 @@ namespace Dxs\Auth\Services;
 use Dxs\Auth\Exceptions\SsoException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
+use stdClass;
 use Throwable;
 
 /**
@@ -45,8 +46,39 @@ final class JwtVerifier
         return $claims;
     }
 
+    /** @return array<string, mixed> validated OIDC Back-Channel Logout token claims */
+    public function verifyLogoutToken(string $jwt): array
+    {
+        $claims = $this->verifyForAudience($jwt, (string) config('sso.client_id'), false);
+        $events = $claims['events'] ?? null;
+        $backChannelEvent = 'http://schemas.openid.net/event/backchannel-logout';
+
+        if ((! is_array($events) && ! $events instanceof stdClass)
+            || ! array_key_exists($backChannelEvent, (array) $events)
+        ) {
+            throw new SsoException('SSO logout token is missing the back-channel logout event.');
+        }
+        if (array_key_exists('nonce', $claims)) {
+            throw new SsoException('SSO logout token must not contain a nonce.');
+        }
+
+        $jwtId = $claims['jti'] ?? null;
+        $sessionId = $claims['sid'] ?? null;
+        $subject = $claims['sub'] ?? null;
+        if (! is_string($jwtId) || $jwtId === '') {
+            throw new SsoException('SSO logout token has no identifier.');
+        }
+        if ((! is_string($sessionId) || $sessionId === '')
+            && (! is_string($subject) || $subject === '')
+        ) {
+            throw new SsoException('SSO logout token has neither a session nor a subject.');
+        }
+
+        return $claims;
+    }
+
     /** @return array<string, mixed> */
-    private function verifyForAudience(string $jwt, string $expectedAudience): array
+    private function verifyForAudience(string $jwt, string $expectedAudience, bool $requireSubject = true): array
     {
         JWT::$leeway = (int) config('sso.leeway');
 
@@ -79,7 +111,7 @@ final class JwtVerifier
             throw new SsoException('SSO token audience is not this service.');
         }
 
-        if (! isset($claims['sub']) || ! is_string($claims['sub']) || $claims['sub'] === '') {
+        if ($requireSubject && (! isset($claims['sub']) || ! is_string($claims['sub']) || $claims['sub'] === '')) {
             throw new SsoException('SSO token has no subject.');
         }
 

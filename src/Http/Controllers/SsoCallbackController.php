@@ -7,6 +7,7 @@ namespace Dxs\Auth\Http\Controllers;
 use Dxs\Auth\Contracts\ProvisionsUsers;
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Services\JwtVerifier;
+use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\Services\TokenExchanger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +26,7 @@ final class SsoCallbackController
         TokenExchanger $exchanger,
         JwtVerifier $verifier,
         ProvisionsUsers $provisioner,
+        LogoutSessionRegistry $logoutSessions,
     ): Response {
         $callbackState = $request->query('state');
         $transaction = is_string($callbackState) && $callbackState !== ''
@@ -78,6 +80,7 @@ final class SsoCallbackController
         $user = $provisioner->provision($claims, $tokens);
         Auth::login($user);
         $request->session()->regenerate();
+        $logoutSessions->register($claims, $tokens['access_token'], $request->session()->getId());
 
         $seconds = (int) ($tokens['expires_in'] ?? 900);
         $cookie = Cookie::make(

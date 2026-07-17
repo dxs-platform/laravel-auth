@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Tests;
 
 use Dxs\Auth\Contracts\ProvisionsUsers;
+use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\SsoClientServiceProvider;
 use Dxs\Auth\Tests\Support\JwtFactory;
 use Illuminate\Auth\GenericUser;
@@ -89,6 +90,17 @@ final class AuthenticateSsoMiddlewareTest extends TestCase
         $this->withToken('not-a-jwt')->getJson('/protected')
             ->assertUnauthorized()
             ->assertJsonPath('message', 'Unauthenticated.');
+        $this->assertSame(0, $this->provisioner->provisionCalls);
+    }
+
+    public function test_a_bearer_revoked_by_back_channel_session_lineage_fails_closed(): void
+    {
+        $token = $this->jwt->token(['sid' => 'revoked-lineage']);
+        $registry = $this->app->make(LogoutSessionRegistry::class);
+        $registry->register(['sid' => 'revoked-lineage', 'exp' => time() + 300], $token, 'session-1');
+        $registry->revoke('revoked-lineage');
+
+        $this->withToken($token)->getJson('/protected')->assertUnauthorized();
         $this->assertSame(0, $this->provisioner->provisionCalls);
     }
 
