@@ -67,11 +67,49 @@ final class SsoLogoutControllerTest extends TestCase
         $this->assertStringContainsString('post_logout_redirect_uri=', $location);
     }
 
+    public function test_inertia_logout_uses_a_top_level_external_location_response(): void
+    {
+        $this->fakeDiscovery(endSession: 'https://id.example.test/sso/logout');
+
+        $response = $this->withHeader('X-Inertia', 'true')
+            ->withSession(['pre-logout-marker' => 'must-be-cleared'])
+            ->post('/auth/logout');
+
+        $response->assertConflict()
+            ->assertHeader('X-Inertia-Location');
+        $this->assertStringStartsWith(
+            'https://id.example.test/sso/logout?',
+            (string) $response->headers->get('X-Inertia-Location'),
+        );
+        $this->assertFalse(session()->has('pre-logout-marker'));
+    }
+
     public function test_logout_falls_back_to_the_local_destination_without_an_end_session_endpoint(): void
     {
         $this->fakeDiscovery();
 
         $this->post('/auth/logout')->assertRedirect('/goodbye');
+    }
+
+    public function test_logout_still_completes_locally_when_discovery_is_unavailable(): void
+    {
+        Http::fake([
+            'https://id.example.test/.well-known/openid-configuration' => Http::response(['error' => 'unavailable'], 503),
+        ]);
+
+        $response = $this->withSession(['pre-logout-marker' => 'must-be-cleared'])
+            ->withCookie('token', 'bearer-must-be-forgotten')
+            ->post('/auth/logout');
+
+        $response->assertRedirect('/goodbye')
+            ->assertSessionHas('sso.warning');
+        $this->assertFalse(session()->has('pre-logout-marker'));
+
+        $cookie = collect($response->headers->getCookies())
+            ->first(fn ($candidate) => $candidate->getName() === 'token');
+
+        $this->assertNotNull($cookie);
+        $this->assertLessThan(time(), $cookie->getExpiresTime());
     }
 
     public function test_logout_regenerates_the_csrf_token(): void

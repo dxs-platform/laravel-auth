@@ -46,6 +46,10 @@ final class AuthorizeSsoPermissionMiddlewareTest extends TestCase
         $app['config']->set('sso.service_slug', 'consumer-a');
         $app['config']->set('sso.client_id', 'consumer-a-client');
         $app['config']->set('sso.permissions_path', 'api/sso/me/permissions');
+        $app['config']->set('authz.permissions', [
+            ['slug' => 'branches.view'],
+            ['slug' => 'branches.create'],
+        ]);
     }
 
     protected function setUp(): void
@@ -139,7 +143,11 @@ final class AuthorizeSsoPermissionMiddlewareTest extends TestCase
             if (str_contains($request->url(), 'api/sso/me/permissions')) {
                 $token = str_replace('Bearer ', '', (string) $request->header('Authorization')[0]);
 
-                return Http::response(['permissions' => $permissions[$token] ?? [], 'roles' => []]);
+                return Http::response([
+                    'permissions' => $permissions[$token] ?? [],
+                    'roles' => [],
+                    'authoritative' => true,
+                ]);
             }
 
             return Http::response([], 500);

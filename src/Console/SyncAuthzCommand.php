@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Dxs\Auth\Console;
 
 use Dxs\Auth\Exceptions\SsoException;
-use Illuminate\Console\Command;
 use Dxs\Auth\Support\SsoCache;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
 /**

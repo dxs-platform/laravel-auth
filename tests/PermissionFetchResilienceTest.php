@@ -35,6 +35,7 @@ final class PermissionFetchResilienceTest extends TestCase
         $app['config']->set('cache.default', 'array');
         $app['config']->set('sso.issuer', 'https://id.example.test');
         $app['config']->set('sso.permissions_path', 'api/sso/me/permissions');
+        $app['config']->set('authz.permissions', [['slug' => 'branches.view']]);
     }
 
     protected function setUp(): void
@@ -93,11 +94,27 @@ final class PermissionFetchResilienceTest extends TestCase
         Http::fake([
             'https://id.example.test/api/sso/me/permissions*' => Http::sequence()
                 ->push('platform down', 503)
-                ->push(['permissions' => ['branches.view'], 'roles' => []], 200),
+                ->push(['permissions' => ['branches.view'], 'roles' => [], 'authoritative' => true], 200),
         ]);
 
         $this->assertFalse(Sso::can('branches.view'));
         $this->assertTrue(Sso::can('branches.view'));
+    }
+
+    public function test_malformed_permission_contracts_fail_closed_without_a_type_error(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'permissions' => 'branches.view',
+                'roles' => ['manager'],
+                'authoritative' => true,
+            ]),
+        ]);
+        Log::spy();
+
+        $this->assertFalse(Gate::forUser(Auth::user())->allows('branches.view'));
+        $this->assertFalse(Sso::hasRole('manager'));
+        Log::shouldHaveReceived('warning')->twice();
     }
 
     private function fakeOutage(): void

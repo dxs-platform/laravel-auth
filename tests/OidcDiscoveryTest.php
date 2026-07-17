@@ -60,6 +60,19 @@ final class OidcDiscoveryTest extends TestCase
         }
     }
 
+    public function test_a_discovery_connection_failure_becomes_a_user_recoverable_sso_error(): void
+    {
+        Http::fake(['*' => Http::failedConnection('socket secret')]);
+
+        try {
+            $this->app->make(OidcDiscovery::class)->document();
+            $this->fail('Expected discovery connection failure.');
+        } catch (SsoException $exception) {
+            $this->assertSame('SSO discovery is temporarily unreachable.', $exception->getMessage());
+            $this->assertStringNotContainsString('socket secret', $exception->getMessage());
+        }
+    }
+
     public function test_it_rejects_a_missing_required_endpoint(): void
     {
         Http::fake(['*' => Http::response($this->document(['authorization_endpoint' => null]))]);

@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace Dxs\Auth;
 
+use Dxs\Auth\Console\InstallCommand;
 use Dxs\Auth\Console\SyncAuthzCommand;
+use Dxs\Auth\Contracts\ProvisionsUsers;
 use Dxs\Auth\Http\Middleware\AuthenticateSso;
 use Dxs\Auth\Http\Middleware\AuthorizeSsoPermission;
+use Dxs\Auth\Provisioning\DatabaseUserProvisioner;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
+use Dxs\Auth\Services\PlatformContextClient;
 use Dxs\Auth\Services\TokenExchanger;
+use Dxs\Auth\Services\TokenRefresher;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Routing\Router;
@@ -25,14 +30,15 @@ final class SsoClientServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/sso.php', 'sso');
         $this->mergeConfigFrom(__DIR__.'/../config/authz.php', 'authz');
 
-        $this->app->singletonIf(\Dxs\Auth\Contracts\ProvisionsUsers::class, \Dxs\Auth\Provisioning\DatabaseUserProvisioner::class);
+        $this->app->singletonIf(ProvisionsUsers::class, DatabaseUserProvisioner::class);
         $this->app->singleton(OidcDiscovery::class);
         $this->app->singleton(JwtVerifier::class);
         $this->app->singleton(LogoutSessionRegistry::class);
         $this->app->singleton(TokenExchanger::class);
-        $this->app->singleton(\Dxs\Auth\Services\TokenRefresher::class);
+        $this->app->singleton(TokenRefresher::class);
         $this->app->singleton(PermissionClient::class);
-        $this->app->singleton(\Dxs\Auth\SsoManager::class);
+        $this->app->singleton(PlatformContextClient::class);
+        $this->app->singleton(SsoManager::class);
     }
 
     public function boot(Router $router): void
@@ -55,7 +61,7 @@ final class SsoClientServiceProvider extends ServiceProvider
         ], 'sso-provisioner');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncAuthzCommand::class, \Dxs\Auth\Console\InstallCommand::class]);
+            $this->commands([SyncAuthzCommand::class, InstallCommand::class]);
         }
 
         // Opt-in scheduled catalog sync: `sso.sync.authz.auto` puts
@@ -92,25 +98,34 @@ final class SsoClientServiceProvider extends ServiceProvider
         // present in the user's platform-resolved permission list. Explicit
         // policies still run for abilities not in the list (Gate::before → null).
         Gate::before(function (Authenticatable $user, string $ability): ?bool {
+            $platformAbilities = collect((array) config('authz.permissions'))
+                ->pluck('slug')
+                ->filter(fn (mixed $slug): bool => is_string($slug) && $slug !== '');
+
+            if (! $platformAbilities->contains($ability)) {
+                return null;
+            }
+
             $token = data_get($user, 'console_access_token');
             $org = data_get($user, 'console_organization_id');
 
             if (! is_string($token) || $token === '' || ! is_string($org) || $org === '') {
-                return null;
+                return false;
             }
 
-            $this->app->make(\Dxs\Auth\Services\TokenRefresher::class)->ensureFresh($user);
+            $this->app->make(TokenRefresher::class)->ensureFresh($user);
             $token = data_get($user, 'console_access_token');
             if (! is_string($token) || $token === '') {
-                return null;
+                return false;
             }
 
             $branch = data_get($user, 'console_branch_id');
             $branch = is_string($branch) && $branch !== '' ? $branch : null;
 
-            return $this->app->make(PermissionClient::class)
-                ->resolveFor($token, $org, $branch)['permissions']
-                ->contains($ability) ? true : null;
+            $decision = $this->app->make(PermissionClient::class)
+                ->resolveFor($token, $org, $branch);
+
+            return $decision['authoritative'] && $decision['permissions']->contains($ability);
         });
 
         // Guests bounced by Laravel's `auth` middleware land on route('login');

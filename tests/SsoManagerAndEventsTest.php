@@ -91,6 +91,36 @@ final class SsoManagerAndEventsTest extends TestCase
         $this->assertFalse(Sso::hasRole('admin'));
     }
 
+    public function test_the_facade_exposes_service_access_and_tenant_directory_without_exposing_the_token(): void
+    {
+        Http::fake([
+            'https://id.example.test/api/sso/me/permissions*' => Http::response([
+                'permissions' => ['branches.view'],
+                'roles' => ['manager'],
+                'service_access' => ['consumer-a' => ['role' => 'manager']],
+                'authoritative' => true,
+            ]),
+            'https://id.example.test/api/sso/organizations' => Http::response([
+                ['organization_id' => self::ORG_ID, 'organization_slug' => 'acme'],
+            ]),
+            'https://id.example.test/api/sso/access*' => Http::response(['service_role' => 'manager']),
+            'https://id.example.test/api/sso/branches*' => Http::response(['branches' => [['id' => 'branch-1']]]),
+            'https://id.example.test/api/sso/brands*' => Http::response(['brands' => [['brand_id' => 'brand-1']]]),
+        ]);
+
+        Auth::setUser(new GenericUser([
+            'id' => 'user-1',
+            'console_access_token' => 'at-private',
+            'console_organization_id' => self::ORG_ID,
+        ]));
+
+        $this->assertSame('manager', Sso::serviceAccess()['consumer-a']['role']);
+        $this->assertSame('acme', Sso::organizations()[0]['organization_slug']);
+        $this->assertSame('manager', Sso::organizationAccess('acme')['service_role']);
+        $this->assertSame('branch-1', Sso::branches('acme')['branches'][0]['id']);
+        $this->assertSame('brand-1', Sso::brands('acme')['brands'][0]['brand_id']);
+    }
+
     public function test_the_facade_reuses_the_gate_permission_cache_no_extra_platform_calls(): void
     {
         $this->actingAsPlatformUser(['x.view'], []);
@@ -104,6 +134,32 @@ final class SsoManagerAndEventsTest extends TestCase
             ->count();
 
         $this->assertSame(1, $calls);
+    }
+
+    public function test_has_role_accepts_the_platform_string_role_contract(): void
+    {
+        $this->actingAsPlatformUser(['branches.view'], ['manager']);
+
+        $this->assertTrue(Sso::hasRole('manager'));
+        $this->assertFalse(Sso::hasRole('admin'));
+    }
+
+    public function test_has_role_cannot_authorize_from_a_non_authoritative_read_model(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'permissions' => [],
+                'roles' => ['manager'],
+                'authoritative' => false,
+            ]),
+        ]);
+        Auth::setUser(new GenericUser([
+            'id' => 'user-1',
+            'console_access_token' => 'at-1',
+            'console_organization_id' => self::ORG_ID,
+        ]));
+
+        $this->assertFalse(Sso::hasRole('manager'));
     }
 
     public function test_a_user_without_platform_context_is_treated_as_unauthenticated_for_permissions(): void
@@ -179,6 +235,7 @@ final class SsoManagerAndEventsTest extends TestCase
             'https://id.example.test/api/sso/me/permissions*' => Http::response([
                 'permissions' => $permissions,
                 'roles' => $roles,
+                'authoritative' => true,
             ]),
         ]);
 

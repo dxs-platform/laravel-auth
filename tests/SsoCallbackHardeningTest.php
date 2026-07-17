@@ -11,7 +11,9 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Orchestra\Testbench\TestCase;
+use Symfony\Component\HttpFoundation\Cookie;
 
 /**
  * Hardening details of the callback's session/cookie handling: the bearer
@@ -96,7 +98,7 @@ final class SsoCallbackHardeningTest extends TestCase
         );
     }
 
-    private \Illuminate\Testing\TestResponse $lastResponse;
+    private TestResponse $lastResponse;
 
     /** @param array<string, mixed> $tokenExtras */
     private function completeCallback(array $tokenExtras): void
@@ -136,7 +138,7 @@ final class SsoCallbackHardeningTest extends TestCase
         $this->lastResponse->assertRedirect('/home');
     }
 
-    private function lastTokenCookie(): \Symfony\Component\HttpFoundation\Cookie
+    private function lastTokenCookie(): Cookie
     {
         $cookie = collect($this->lastResponse->headers->getCookies())
             ->first(fn ($candidate) => $candidate->getName() === 'token');

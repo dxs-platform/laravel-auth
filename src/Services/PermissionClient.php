@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Dxs\Auth\Services;
 
 use Dxs\Auth\Exceptions\SsoException;
-use Illuminate\Support\Collection;
 use Dxs\Auth\Support\SsoCache;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -26,7 +27,7 @@ final class PermissionClient
     public function __construct(private readonly OidcDiscovery $discovery) {}
 
     /**
-     * @return array{permissions: list<string>, roles: list<array<string,mixed>>}
+     * @return array{permissions: list<string>, roles: list<mixed>, service_access: array<string, mixed>, contract_version: ?string, evaluated_at: ?string, authoritative: bool}
      */
     public function fetch(string $accessToken, string $organizationId, ?string $branchId = null): array
     {
@@ -37,25 +38,69 @@ final class PermissionClient
         return SsoCache::store()->remember($key, (int) config('sso.permissions_ttl', 300), function () use ($accessToken, $organizationId, $branchId): array {
             $url = rtrim((string) config('sso.issuer'), '/').'/'.ltrim((string) config('sso.permissions_path', 'api/sso/me/permissions'), '/');
 
-            $response = Http::withToken($accessToken)
-                ->timeout((int) config('sso.http_timeout'))
-                ->acceptJson()
-                ->get($url, array_filter([
-                    'organization_id' => $organizationId,
-                    'branch_id' => $branchId,
-                ]));
+            try {
+                $response = Http::withToken($accessToken)
+                    ->timeout((int) config('sso.http_timeout'))
+                    ->connectTimeout(min(3, (int) config('sso.http_timeout')))
+                    ->acceptJson()
+                    ->get($url, array_filter([
+                        'organization_id' => $organizationId,
+                        'branch_id' => $branchId,
+                    ]));
+            } catch (ConnectionException $exception) {
+                throw new SsoException('Permission service is temporarily unreachable.', previous: $exception);
+            }
 
             if ($response->failed()) {
-                throw new SsoException("Permission fetch failed ({$response->status()}) from {$url}: ".$response->body());
+                throw new SsoException("Permission fetch failed ({$response->status()}) from {$url}.");
             }
 
             $data = $response->json();
+            if (! is_array($data)) {
+                throw new SsoException('Permission service returned a malformed response.');
+            }
+
+            $permissions = $data['permissions'] ?? null;
+            $roles = $data['roles'] ?? null;
+            $authoritative = $data['authoritative'] ?? null;
+
+            if (! is_array($permissions)
+                || ! array_is_list($permissions)
+                || collect($permissions)->contains(fn (mixed $permission): bool => ! is_string($permission) || $permission === '')
+                || ! is_array($roles)
+                || ! array_is_list($roles)
+                || collect($roles)->contains(fn (mixed $role): bool => ! $this->isValidRole($role))
+                || ! is_bool($authoritative)
+                || (isset($data['service_access']) && ! is_array($data['service_access']))
+                || (isset($data['contract_version']) && ! is_string($data['contract_version']))
+                || (isset($data['evaluated_at']) && ! is_string($data['evaluated_at']))) {
+                throw new SsoException('Permission service returned a malformed response.');
+            }
 
             return [
-                'permissions' => array_values(array_map('strval', $data['permissions'] ?? [])),
-                'roles' => array_values($data['roles'] ?? []),
+                'permissions' => $permissions,
+                'roles' => $roles,
+                'service_access' => is_array($data['service_access'] ?? null) ? $data['service_access'] : [],
+                'contract_version' => is_string($data['contract_version'] ?? null) ? $data['contract_version'] : null,
+                'evaluated_at' => is_string($data['evaluated_at'] ?? null) ? $data['evaluated_at'] : null,
+                'authoritative' => $authoritative,
             ];
         });
+    }
+
+    private function isValidRole(mixed $role): bool
+    {
+        if (is_string($role)) {
+            return $role !== '';
+        }
+
+        if (! is_array($role)) {
+            return false;
+        }
+
+        $identifier = $role['role'] ?? $role['slug'] ?? null;
+
+        return is_string($identifier) && $identifier !== '';
     }
 
     /**
@@ -105,7 +150,7 @@ final class PermissionClient
      * job) — the raw fetch()/permissionsFor() always throw for callers that
      * want to handle it themselves.
      *
-     * @return array{permissions: Collection<int, string>, roles: list<array<string, mixed>>}
+     * @return array{permissions: Collection<int, string>, roles: list<mixed>, service_access: array<string, mixed>, contract_version: ?string, evaluated_at: ?string, authoritative: bool}
      */
     public function resolveFor(string $accessToken, string $organizationId, ?string $branchId = null): array
     {
@@ -115,6 +160,10 @@ final class PermissionClient
             return [
                 'permissions' => collect($result['permissions']),
                 'roles' => $result['roles'],
+                'service_access' => $result['service_access'],
+                'contract_version' => $result['contract_version'],
+                'evaluated_at' => $result['evaluated_at'],
+                'authoritative' => $result['authoritative'],
             ];
         } catch (SsoException $exception) {
             if ((bool) config('sso.permissions.strict', false)) {
@@ -123,7 +172,14 @@ final class PermissionClient
 
             Log::warning('SSO permission fetch failed — denying (fail-closed): '.$exception->getMessage());
 
-            return ['permissions' => collect(), 'roles' => []];
+            return [
+                'permissions' => collect(),
+                'roles' => [],
+                'service_access' => [],
+                'contract_version' => null,
+                'evaluated_at' => null,
+                'authoritative' => false,
+            ];
         }
     }
 }

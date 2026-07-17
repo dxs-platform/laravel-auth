@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Services;
 
 use Dxs\Auth\Exceptions\SsoException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -43,17 +44,22 @@ final class TokenExchanger
      */
     private function post(array $payload): array
     {
-        $response = Http::timeout((int) config('sso.http_timeout'))
-            ->asForm()
-            ->acceptJson()
-            ->post($this->discovery->tokenEndpoint(), array_merge($payload, [
-                'service_slug' => (string) config('sso.service_slug'),
-                'client_id' => (string) config('sso.client_id'),
-                'client_secret' => (string) config('sso.client_secret'),
-            ]));
+        try {
+            $response = Http::connectTimeout(min(3, (int) config('sso.http_timeout')))
+                ->timeout((int) config('sso.http_timeout'))
+                ->asForm()
+                ->acceptJson()
+                ->post($this->discovery->tokenEndpoint(), array_merge($payload, [
+                    'service_slug' => (string) config('sso.service_slug'),
+                    'client_id' => (string) config('sso.client_id'),
+                    'client_secret' => (string) config('sso.client_secret'),
+                ]));
+        } catch (ConnectionException $exception) {
+            throw new SsoException('SSO token endpoint is temporarily unreachable.', previous: $exception);
+        }
 
         if ($response->failed()) {
-            throw new SsoException("SSO token exchange failed ({$response->status()}): ".$response->body());
+            throw new SsoException("SSO token exchange failed ({$response->status()}).");
         }
 
         $data = $response->json();

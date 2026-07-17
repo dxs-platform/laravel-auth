@@ -7,6 +7,8 @@ namespace Dxs\Auth\Tests;
 use Dxs\Auth\Contracts\ProvisionsUsers;
 use Dxs\Auth\Provisioning\DatabaseUserProvisioner;
 use Dxs\Auth\SsoClientServiceProvider;
+use Illuminate\Auth\GenericUser;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Illuminate\Support\Carbon;
 use Orchestra\Testbench\TestCase;
@@ -57,12 +59,12 @@ final class TurnkeyInstallTest extends TestCase
     {
         $custom = new class implements ProvisionsUsers
         {
-            public function provision(array $claims, array $tokens): \Illuminate\Contracts\Auth\Authenticatable
+            public function provision(array $claims, array $tokens): Authenticatable
             {
-                return new \Illuminate\Auth\GenericUser(['id' => 'custom']);
+                return new GenericUser(['id' => 'custom']);
             }
 
-            public function resolveBySubject(string $subject): ?\Illuminate\Contracts\Auth\Authenticatable
+            public function resolveBySubject(string $subject): ?Authenticatable
             {
                 return null;
             }
@@ -81,6 +83,7 @@ final class TurnkeyInstallTest extends TestCase
             'name' => 'Turnkey User',
             'email' => 'turnkey@example.test',
             'organization_id' => 'org-1',
+            'organization_context_id' => 'console-org-1',
         ], [
             'access_token' => 'at-1',
             'refresh_token' => 'rt-1',
@@ -90,7 +93,7 @@ final class TurnkeyInstallTest extends TestCase
         $this->assertSame('cu_1', $user->console_user_id);
         $this->assertSame('Turnkey User', $user->name);
         $this->assertSame('turnkey@example.test', $user->email);
-        $this->assertSame('org-1', $user->console_organization_id);
+        $this->assertSame('console-org-1', $user->console_organization_id);
         $this->assertSame('at-1', $user->console_access_token);
         $this->assertSame('rt-1', $user->console_refresh_token);
         $this->assertEqualsWithDelta(Carbon::now()->addSeconds(900)->timestamp, Carbon::parse($user->console_token_expires_at)->timestamp, 5);

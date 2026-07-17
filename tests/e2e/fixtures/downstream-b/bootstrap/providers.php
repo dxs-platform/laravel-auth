@@ -1,3 +1,5 @@
 <?php
 
-return [App\Providers\AppServiceProvider::class];
+use App\Providers\AppServiceProvider;
+
+return [AppServiceProvider::class];

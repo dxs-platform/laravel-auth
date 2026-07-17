@@ -48,7 +48,7 @@ final class SsoCallbackController
         $return = $transaction['return'] ?? null;
 
         if ($request->filled('error')) {
-            throw new SsoException('SSO authorization was denied by the identity provider.');
+            throw new SsoException($this->callbackErrorMessage($request->query('error')));
         }
 
         $authorizationCode = $request->query('code');
@@ -150,5 +150,17 @@ final class SsoCallbackController
     private function requestsOpenId(): bool
     {
         return in_array('openid', preg_split('/\s+/', trim((string) config('sso.scopes'))) ?: [], true);
+    }
+
+    private function callbackErrorMessage(mixed $error): string
+    {
+        return match ($error) {
+            'access_denied' => 'SSO authorization was denied by the identity provider.',
+            'login_required' => 'Your identity provider session expired. Please sign in again.',
+            'interaction_required', 'consent_required', 'account_selection_required' => 'The identity provider requires additional interaction. Please try signing in again.',
+            'temporarily_unavailable', 'server_error' => 'The identity provider is temporarily unavailable. Please try again.',
+            'invalid_request', 'unauthorized_client', 'unsupported_response_type', 'invalid_scope' => 'The identity provider rejected the sign-in request. Please contact support if this continues.',
+            default => 'SSO sign-in failed at the identity provider. Please try again.',
+        };
     }
 }

@@ -30,6 +30,11 @@ final class GateDelegationTest extends TestCase
         $app['config']->set('sso.issuer', 'https://id.example.test');
         $app['config']->set('sso.permissions_path', 'api/sso/me/permissions');
         $app['config']->set('sso.permissions_ttl', 300);
+        $app['config']->set('authz.permissions', [
+            ['slug' => 'dashboard.view'],
+            ['slug' => 'employees.view'],
+            ['slug' => 'employees.delete'],
+        ]);
     }
 
     protected function setUp(): void
@@ -109,7 +114,22 @@ final class GateDelegationTest extends TestCase
             'https://id.example.test/api/sso/me/permissions*' => Http::response([
                 'permissions' => $permissions,
                 'roles' => [],
+                'authoritative' => true,
             ]),
         ]);
+    }
+
+    public function test_a_non_authoritative_read_model_cannot_grant_a_declared_ability(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'permissions' => ['dashboard.view'],
+                'roles' => [],
+                'authoritative' => false,
+            ]),
+        ]);
+        Gate::define('dashboard.view', fn (): bool => true);
+
+        $this->assertFalse(Gate::forUser($this->platformUser())->allows('dashboard.view'));
     }
 }

@@ -89,6 +89,36 @@ final class TokenExchangerTest extends TestCase
         $this->exchanger()->exchangeCode('bad-code', 'verifier');
     }
 
+    public function test_a_token_error_body_and_transport_detail_are_never_exposed(): void
+    {
+        $this->fakeTokenEndpoint([
+            'error' => 'invalid_grant',
+            'error_description' => 'client_secret=must-not-leak',
+        ], status: 400);
+
+        try {
+            $this->exchanger()->exchangeCode('bad-code', 'verifier');
+            $this->fail('Expected token exchange failure.');
+        } catch (SsoException $exception) {
+            $this->assertSame('SSO token exchange failed (400).', $exception->getMessage());
+            $this->assertStringNotContainsString('must-not-leak', $exception->getMessage());
+        }
+
+        Cache::clear();
+        Http::fake([
+            'https://id.example.test/.well-known/openid-configuration' => Http::response($this->discovery()),
+            'https://id.example.test/api/sso/token' => Http::failedConnection('network credential must-not-leak'),
+        ]);
+
+        try {
+            $this->exchanger()->refresh('rt-1');
+            $this->fail('Expected token connection failure.');
+        } catch (SsoException $exception) {
+            $this->assertSame('SSO token endpoint is temporarily unreachable.', $exception->getMessage());
+            $this->assertStringNotContainsString('must-not-leak', $exception->getMessage());
+        }
+    }
+
     #[DataProvider('malformedBodies')]
     public function test_a_malformed_token_body_fails_closed(mixed $body): void
     {

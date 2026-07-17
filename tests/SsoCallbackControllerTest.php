@@ -104,7 +104,7 @@ final class SsoCallbackControllerTest extends TestCase
                 ]));
             $this->fail('Expected the authorization error to fail the callback.');
         } catch (SsoException $exception) {
-            $this->assertSame('SSO authorization was denied by the identity provider.', $exception->getMessage());
+            $this->assertSame('SSO sign-in failed at the identity provider. Please try again.', $exception->getMessage());
         }
 
         Http::assertNothingSent();
@@ -122,6 +122,36 @@ final class SsoCallbackControllerTest extends TestCase
             $this->fail('Expected state validation to fail.');
         } catch (SsoException $exception) {
             $this->assertStringContainsString('state mismatch', $exception->getMessage());
+        }
+
+        Http::assertNothingSent();
+    }
+
+    public function test_authorization_error_codes_are_safely_mapped_without_echoing_provider_details(): void
+    {
+        $cases = [
+            'access_denied' => 'SSO authorization was denied by the identity provider.',
+            'login_required' => 'Your identity provider session expired. Please sign in again.',
+            'interaction_required' => 'The identity provider requires additional interaction. Please try signing in again.',
+            'temporarily_unavailable' => 'The identity provider is temporarily unavailable. Please try again.',
+            'invalid_request' => 'The identity provider rejected the sign-in request. Please contact support if this continues.',
+            'private_provider_error' => 'SSO sign-in failed at the identity provider. Please try again.',
+        ];
+
+        foreach ($cases as $error => $message) {
+            try {
+                $this->withoutExceptionHandling()
+                    ->withSession($this->boundSession())
+                    ->get('/auth/callback?'.http_build_query([
+                        'error' => $error,
+                        'error_description' => 'secret-must-not-leak',
+                        'state' => 'bound-state',
+                    ]));
+                $this->fail('Expected authorization error.');
+            } catch (SsoException $exception) {
+                $this->assertSame($message, $exception->getMessage());
+                $this->assertStringNotContainsString('secret-must-not-leak', $exception->getMessage());
+            }
         }
 
         Http::assertNothingSent();

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Dxs\Auth;
 
+use Dxs\Auth\Facades\Sso;
 use Dxs\Auth\Services\PermissionClient;
+use Dxs\Auth\Services\PlatformContextClient;
 use Dxs\Auth\Services\TokenRefresher;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
@@ -12,7 +14,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * The ergonomic read surface for the current user's platform authorization —
- * what the {@see \Dxs\Auth\Facades\Sso} facade proxies. Gate answers yes/no
+ * what the {@see Sso} facade proxies. Gate answers yes/no
  * per ability; this exposes the whole platform-resolved picture (permission
  * slugs AND roles) so downstream controllers, views and Inertia share can
  * render "what can this user do" without touching the HTTP client.
@@ -25,6 +27,7 @@ final class SsoManager
     public function __construct(
         private readonly PermissionClient $permissions,
         private readonly TokenRefresher $refresher,
+        private readonly PlatformContextClient $platformContext,
     ) {}
 
     /** The currently authenticated user, if any. */
@@ -59,7 +62,7 @@ final class SsoManager
      * The current user's platform roles (each a {slug/display_name/level/…}
      * shape as the platform declared it).
      *
-     * @return list<array<string, mixed>>
+     * @return list<string|array<string, mixed>>
      */
     public function roles(): array
     {
@@ -71,33 +74,74 @@ final class SsoManager
         return $this->permissions->resolveFor($context['token'], $context['organization'], $context['branch'])['roles'];
     }
 
+    /** @return array<string, mixed> */
+    public function serviceAccess(): array
+    {
+        $context = $this->context();
+
+        return $context === null
+            ? []
+            : $this->permissions->resolveFor($context['token'], $context['organization'], $context['branch'])['service_access'];
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function organizations(): array
+    {
+        $context = $this->context();
+
+        return $context === null ? [] : $this->platformContext->organizations($context['token']);
+    }
+
+    /** @return array<string, mixed> */
+    public function organizationAccess(string $organizationSlug): array
+    {
+        $context = $this->context();
+
+        return $context === null ? [] : $this->platformContext->access($context['token'], $organizationSlug);
+    }
+
+    /** @return array<string, mixed> */
+    public function branches(string $organizationSlug): array
+    {
+        $context = $this->context();
+
+        return $context === null ? [] : $this->platformContext->branches($context['token'], $organizationSlug);
+    }
+
+    /** @return array<string, mixed> */
+    public function brands(string $organizationSlug): array
+    {
+        $context = $this->context();
+
+        return $context === null ? [] : $this->platformContext->brands($context['token'], $organizationSlug);
+    }
+
     /** True when the current user holds the given platform permission. */
     public function can(string $ability): bool
     {
-        return $this->permissions()->contains($ability);
+        $context = $this->context();
+        if ($context === null) {
+            return false;
+        }
+
+        $decision = $this->permissions->resolveFor($context['token'], $context['organization'], $context['branch']);
+
+        return $decision['authoritative'] && $decision['permissions']->contains($ability);
     }
 
     /** True when the current user holds every listed permission. */
     public function canAll(string ...$abilities): bool
     {
-        $held = $this->permissions();
+        $held = collect($abilities)->filter(fn (string $ability): bool => $this->can($ability));
 
-        foreach ($abilities as $ability) {
-            if (! $held->contains($ability)) {
-                return false;
-            }
-        }
-
-        return true;
+        return $held->count() === count($abilities);
     }
 
     /** True when the current user holds at least one listed permission. */
     public function canAny(string ...$abilities): bool
     {
-        $held = $this->permissions();
-
         foreach ($abilities as $ability) {
-            if ($held->contains($ability)) {
+            if ($this->can($ability)) {
                 return true;
             }
         }
@@ -108,7 +152,25 @@ final class SsoManager
     /** True when the current user holds a platform role by name. */
     public function hasRole(string $role): bool
     {
-        foreach ($this->roles() as $declared) {
+        $context = $this->context();
+        if ($context === null) {
+            return false;
+        }
+
+        $decision = $this->permissions->resolveFor($context['token'], $context['organization'], $context['branch']);
+        if (! $decision['authoritative']) {
+            return false;
+        }
+
+        foreach ($decision['roles'] as $declared) {
+            if (is_string($declared) && hash_equals($declared, $role)) {
+                return true;
+            }
+
+            if (! is_array($declared)) {
+                continue;
+            }
+
             if (($declared['role'] ?? $declared['slug'] ?? null) === $role) {
                 return true;
             }

@@ -7,6 +7,7 @@ namespace Dxs\Auth\Tests;
 use Dxs\Auth\Contracts\ProvisionsUsers;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\LogoutSessionRegistry;
+use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
 use Dxs\Auth\SsoClientServiceProvider;
 use Dxs\Auth\Support\SsoCache;
@@ -73,11 +74,11 @@ final class CacheAndSyncConfigurationTest extends TestCase
     public function test_by_default_the_package_rides_the_apps_default_laravel_cache(): void
     {
         $this->fakeIdp();
-        $this->app->make(\Dxs\Auth\Services\OidcDiscovery::class)->authorizationEndpoint();
+        $this->app->make(OidcDiscovery::class)->authorizationEndpoint();
 
         // Flushing the DEFAULT store forces a refetch → it was cached there.
         Cache::flush();
-        $this->app->make(\Dxs\Auth\Services\OidcDiscovery::class)->authorizationEndpoint();
+        $this->app->make(OidcDiscovery::class)->authorizationEndpoint();
 
         $this->assertSame(2, $this->requestCount('openid-configuration'));
     }
@@ -90,16 +91,16 @@ final class CacheAndSyncConfigurationTest extends TestCase
         $this->assertSame('acme:x', SsoCache::key('x'));
 
         $this->fakeIdp();
-        $this->app->make(\Dxs\Auth\Services\OidcDiscovery::class)->authorizationEndpoint();
+        $this->app->make(OidcDiscovery::class)->authorizationEndpoint();
 
         // Flushing the app default store must NOT evict the package cache…
         Cache::flush();
-        $this->app->make(\Dxs\Auth\Services\OidcDiscovery::class)->authorizationEndpoint();
+        $this->app->make(OidcDiscovery::class)->authorizationEndpoint();
         $this->assertSame(1, $this->requestCount('openid-configuration'));
 
         // …but flushing the configured store does.
         Cache::store('sso-isolated')->flush();
-        $this->app->make(\Dxs\Auth\Services\OidcDiscovery::class)->authorizationEndpoint();
+        $this->app->make(OidcDiscovery::class)->authorizationEndpoint();
         $this->assertSame(2, $this->requestCount('openid-configuration'));
     }
 
@@ -237,7 +238,7 @@ final class CacheAndSyncConfigurationTest extends TestCase
                 return Http::response($this->jwt->jwks());
             }
             if (str_contains($request->url(), 'permissions')) {
-                return Http::response(['permissions' => ['x.view'], 'roles' => []]);
+                return Http::response(['permissions' => ['x.view'], 'roles' => [], 'authoritative' => true]);
             }
 
             return Http::response(['ok' => true]);

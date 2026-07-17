@@ -40,6 +40,7 @@ final class PermissionClientTest extends TestCase
                 'roles' => ['operator'],
                 'service_access' => ['consumer-a' => ['permissions' => ['records.read']]],
                 'contract_version' => '1.0',
+                'authoritative' => true,
             ]),
         ]);
 
@@ -51,6 +52,8 @@ final class PermissionClientTest extends TestCase
 
         $this->assertSame(['records.read', 'records.write'], $result['permissions']);
         $this->assertSame(['operator'], $result['roles']);
+        $this->assertSame(['consumer-a' => ['permissions' => ['records.read']]], $result['service_access']);
+        $this->assertSame('1.0', $result['contract_version']);
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer service-access-token')
             && $request['organization_id'] === '9f79d9ee-d735-4673-a80d-c11339f252be'
             && $request['branch_id'] === '00e9289b-f980-48ea-8943-b91cb4de3e85');
@@ -59,9 +62,9 @@ final class PermissionClientTest extends TestCase
     public function test_cache_is_isolated_by_token_organization_and_branch(): void
     {
         Http::fakeSequence()
-            ->push(['permissions' => ['a'], 'roles' => []])
-            ->push(['permissions' => ['b'], 'roles' => []])
-            ->push(['permissions' => ['c'], 'roles' => []]);
+            ->push(['permissions' => ['a'], 'roles' => [], 'authoritative' => true])
+            ->push(['permissions' => ['b'], 'roles' => [], 'authoritative' => true])
+            ->push(['permissions' => ['c'], 'roles' => [], 'authoritative' => true]);
 
         $client = $this->app->make(PermissionClient::class);
 

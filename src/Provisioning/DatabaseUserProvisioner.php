@@ -34,7 +34,9 @@ final class DatabaseUserProvisioner implements ProvisionsUsers
             'console_user_id' => $subject,
             'name' => $claims['name'] ?? $user->getAttribute('name') ?? '',
             'email' => $claims['email'] ?? $user->getAttribute('email') ?? '',
-            'console_organization_id' => $claims['organization_id'] ?? $user->getAttribute('console_organization_id'),
+            'console_organization_id' => $claims['organization_context_id']
+                ?? $claims['organization_id']
+                ?? $user->getAttribute('console_organization_id'),
             'console_access_token' => $tokens['access_token'] ?? null,
             'console_refresh_token' => $tokens['refresh_token'] ?? $user->getAttribute('console_refresh_token'),
             'console_token_expires_at' => isset($tokens['expires_in'])

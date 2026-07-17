@@ -6,9 +6,9 @@ namespace Dxs\Auth\Tests;
 
 use Dxs\Auth\Services\TokenRefresher;
 use Dxs\Auth\SsoClientServiceProvider;
+use Dxs\Auth\Support\SsoCache;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Auth\User as AuthUser;
-use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -133,7 +133,7 @@ final class TokenRefreshTest extends TestCase
         $user = $this->makeUser('old-at', 'shared-rt', now()->subMinute());
 
         // Simulate another request already refreshing: it holds the lock.
-        $held = \Dxs\Auth\Support\SsoCache::store()
+        $held = SsoCache::store()
             ->lock('sso:refresh-lock:'.hash('sha256', 'shared-rt'), 10);
         $this->assertTrue($held->get());
 

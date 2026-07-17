@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Http\Controllers;
 
 use Dxs\Auth\Events\SsoLoggedOut;
+use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
 use Illuminate\Http\Request;
@@ -32,11 +33,25 @@ final class SsoLogoutController
         $request->session()->regenerateToken();
 
         $forget = Cookie::forget((string) config('sso.token_cookie'));
-        $end = $discovery->endSessionEndpoint();
+        try {
+            $end = $discovery->endSessionEndpoint();
+        } catch (SsoException $exception) {
+            report($exception);
+
+            return redirect()->to((string) config('sso.after_logout'))
+                ->with('sso.warning', 'You were signed out locally, but Platform sign-out could not be confirmed. Close other Platform tabs if this is a shared device.')
+                ->withCookie($forget);
+        }
 
         $target = $end !== null
             ? $this->endSessionUrl($end)
             : (string) config('sso.after_logout');
+
+        if ($end !== null && $request->header('X-Inertia') === 'true') {
+            return response('', 409)
+                ->header('X-Inertia-Location', $target)
+                ->withCookie($forget);
+        }
 
         return redirect()->to($target)->withCookie($forget);
     }

@@ -6,6 +6,7 @@ namespace Dxs\Auth\Services;
 
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Support\SsoCache;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -20,7 +21,14 @@ final class OidcDiscovery
     {
         return SsoCache::store()->remember($this->cacheKey('discovery'), (int) config('sso.discovery_ttl'), function (): array {
             $url = rtrim((string) config('sso.issuer'), '/').'/.well-known/openid-configuration';
-            $response = Http::timeout((int) config('sso.http_timeout'))->acceptJson()->get($url);
+            try {
+                $response = Http::connectTimeout(min(3, (int) config('sso.http_timeout')))
+                    ->timeout((int) config('sso.http_timeout'))
+                    ->acceptJson()
+                    ->get($url);
+            } catch (ConnectionException $exception) {
+                throw new SsoException('SSO discovery is temporarily unreachable.', previous: $exception);
+            }
 
             if ($response->failed()) {
                 throw new SsoException("SSO discovery failed ({$response->status()}) from {$url}");
@@ -71,7 +79,14 @@ final class OidcDiscovery
         }
 
         return SsoCache::store()->remember($cacheKey, $this->jwksTtl(), function (): array {
-            $response = Http::timeout((int) config('sso.http_timeout'))->acceptJson()->get($this->jwksUri());
+            try {
+                $response = Http::connectTimeout(min(3, (int) config('sso.http_timeout')))
+                    ->timeout((int) config('sso.http_timeout'))
+                    ->acceptJson()
+                    ->get($this->jwksUri());
+            } catch (ConnectionException $exception) {
+                throw new SsoException('SSO signing keys are temporarily unreachable.', previous: $exception);
+            }
 
             if ($response->failed()) {
                 throw new SsoException("SSO JWKS fetch failed ({$response->status()}).");

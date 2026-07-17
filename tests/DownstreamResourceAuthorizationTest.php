@@ -70,6 +70,9 @@ final class DownstreamResourceAuthorizationTest extends TestCase
         $app['config']->set('sso.client_secret', 'consumer-a-secret');
         $app['config']->set('sso.permissions_path', 'api/sso/me/permissions');
         $app['config']->set('sso.permissions_ttl', 300);
+        $app['config']->set('authz.permissions', collect(self::ADMIN_PERMISSIONS)
+            ->map(fn (string $slug): array => ['slug' => $slug])
+            ->all());
     }
 
     protected function setUp(): void
@@ -296,12 +299,14 @@ final class DownstreamResourceAuthorizationTest extends TestCase
             $token === $this->adminToken => [
                 'permissions' => self::ADMIN_PERMISSIONS,
                 'roles' => [['role' => 'admin', 'display_name' => 'Administrator', 'level' => 100]],
+                'authoritative' => true,
             ],
             $token === $this->staffToken, $token === $this->branchToken => [
                 'permissions' => self::STAFF_PERMISSIONS,
                 'roles' => [['role' => 'staff', 'display_name' => 'Staff', 'level' => 10]],
+                'authoritative' => true,
             ],
-            default => ['permissions' => [], 'roles' => []],
+            default => ['permissions' => [], 'roles' => [], 'authoritative' => true],
         };
     }
 

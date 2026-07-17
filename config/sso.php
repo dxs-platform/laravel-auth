@@ -99,6 +99,18 @@ return [
     'permissions_ttl' => (int) env('SSO_PERMISSIONS_TTL', 300),
 
     /*
+     * Read-only tenant directory exposed by the IdP to downstream SaaS apps.
+     * These endpoints use the current user's OAuth bearer and therefore keep
+     * tenant membership enforcement authoritative on the platform.
+     */
+    'context_paths' => [
+        'organizations' => env('SSO_ORGANIZATIONS_PATH', 'api/sso/organizations'),
+        'access' => env('SSO_ACCESS_PATH', 'api/sso/access'),
+        'branches' => env('SSO_BRANCHES_PATH', 'api/sso/branches'),
+        'brands' => env('SSO_BRANDS_PATH', 'api/sso/brands'),
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | Catalog registration (push this service's permission codes UP to the IdP)
     |--------------------------------------------------------------------------
