@@ -22,6 +22,21 @@ return [
     // receive this UUID on the platform launch URL and relay it server-side.
     'organization_context_id' => env('SSO_ORGANIZATION_CONTEXT_ID', ''),
 
+    /*
+     * Internal platform Organization id expected in the access token's
+     * `organization_id` claim. The current platform IdP stamps the service
+     * instance's organization id into service tokens instead of the console
+     * `organization_context_id`; set this to accept those tokens.
+     */
+    'organization_id' => env('SSO_ORGANIZATION_ID', ''),
+
+    /*
+     * Where a failed SSO flow (denied consent, expired state, unreachable IdP)
+     * redirects the user, with the error message flashed under `sso.error`.
+     * Falls back to `after_logout`, then `/`.
+     */
+    'failure_redirect' => env('SSO_FAILURE_REDIRECT', ''),
+
     // Must exactly match one of the instance's allowed_redirect_uris on the platform.
     'redirect_uri' => env('SSO_REDIRECT_URI', env('APP_URL').'/auth/callback'),
 
