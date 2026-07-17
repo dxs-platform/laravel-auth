@@ -12,8 +12,12 @@ permission list and answers `Gate` from it. The service only declares its permis
 ## Install
 
 ```bash
-composer require dxs/laravel-auth:^0.2
+composer require dxs/laravel-auth:^0.4
 ```
+
+> **New to the platform?** Follow the step-by-step [downstream onboarding guide](docs/onboarding.md) —
+> it covers service registration, every env value, the users-table migration, and a
+> symptom→cause debugging map collected from a real integration.
 
 The service provider auto-discovers. Publish config if you want to tweak it:
 
