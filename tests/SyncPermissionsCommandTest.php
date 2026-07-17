@@ -20,11 +20,36 @@ final class SyncPermissionsCommandTest extends TestCase
     protected function defineEnvironment($app): void
     {
         $app['config']->set('sso.issuer', 'https://id.example.test');
-        $app['config']->set('sso.service_id', 'service/a?tenant=other');
-        $app['config']->set('sso.authz_path', 'api/admin/services/{service}/authz');
+        $app['config']->set('sso.service_id', 'consumer-a');
         $app['config']->set('sso.admin_token', 'admin-secret');
         $app['config']->set('sso.http_timeout', 5);
         $app['config']->set('permissions', $this->catalog('consumer-a.read'));
+    }
+
+    public function test_empty_catalog_is_a_no_op(): void
+    {
+        Http::fake();
+        config()->set('permissions', [
+            'permissions' => [],
+            'roles' => [],
+            'default_role' => null,
+        ]);
+
+        $this->artisan('dxs:sync-permissions')
+            ->expectsOutputToContain('nothing to sync')
+            ->assertSuccessful();
+
+        Http::assertNothingSent();
+    }
+
+    public function test_missing_service_id_fails_before_http(): void
+    {
+        Http::fake();
+        config()->set('sso.service_id', '');
+
+        $this->artisan('dxs:sync-permissions')->assertFailed();
+
+        Http::assertNothingSent();
     }
 
     public function test_dry_run_is_deterministic_and_performs_no_http_request(): void
@@ -46,6 +71,7 @@ final class SyncPermissionsCommandTest extends TestCase
             ['permissions' => [['slug' => 'same'], ['slug' => 'same']]],
             ['permissions' => [['slug' => 'known']], 'roles' => [['role' => 'admin', 'permissions' => ['unknown']]]],
             ['permissions' => [['slug' => '']]],
+            ['permissions' => [['slug' => 'Invalid Slug']]],
             ['permissions' => [['slug' => 'known']], 'roles' => [], 'default_role' => 'missing'],
         ] as $catalog) {
             config()->set('permissions', $catalog);
@@ -56,7 +82,17 @@ final class SyncPermissionsCommandTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_service_identifier_is_encoded_and_repeated_sync_is_idempotent(): void
+    public function test_missing_admin_token_fails_before_http(): void
+    {
+        Http::fake();
+        config()->set('sso.admin_token', '');
+
+        $this->artisan('dxs:sync-permissions')->assertFailed();
+
+        Http::assertNothingSent();
+    }
+
+    public function test_default_endpoint_payload_and_repeated_sync_match_the_platform_contract(): void
     {
         Http::fake(['*' => Http::response(['registered' => true])]);
 
@@ -64,9 +100,23 @@ final class SyncPermissionsCommandTest extends TestCase
         $this->artisan('dxs:sync-permissions')->assertSuccessful();
 
         Http::assertSentCount(2);
-        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://id.example.test/api/admin/services/service%2Fa%3Ftenant%3Dother/authz'
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'PUT'
+            && $request->url() === 'https://id.example.test/api/admin/catalog/consumer-a/authz'
             && $request->hasHeader('Authorization', 'Bearer admin-secret')
-            && $request['permissions'][0]['slug'] === 'consumer-a.read');
+            && $request->data() === $this->catalog('consumer-a.read')
+            && ! array_key_exists('code', $request['permissions'][0])
+            && ! array_key_exists('name', $request['permissions'][0]));
+    }
+
+    public function test_service_identifier_is_encoded_and_path_is_configurable(): void
+    {
+        Http::fake(['*' => Http::response(['registered' => true])]);
+        config()->set('sso.service_id', 'payroll.v2-prod');
+        config()->set('sso.authz_path', 'api/dev/services/{service}/authz');
+
+        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://id.example.test/api/dev/services/payroll.v2-prod/authz');
     }
 
     public function test_two_services_send_disjoint_catalogs_to_disjoint_endpoints(): void
@@ -86,6 +136,19 @@ final class SyncPermissionsCommandTest extends TestCase
             && $request['permissions'][0]['slug'] === 'consumer-b.write');
     }
 
+    public function test_missing_optional_catalog_keys_are_sent_with_platform_defaults(): void
+    {
+        Http::fake(['*' => Http::response(['registered' => true])]);
+        config()->set('permissions', [
+            'permissions' => [['slug' => 'consumer-a.read', 'display_name' => 'Permission']],
+        ]);
+
+        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => $request['roles'] === []
+            && $request['default_role'] === null);
+    }
+
     public function test_failed_sync_does_not_reflect_the_response_body(): void
     {
         Http::fake(['*' => Http::response(['debug' => 'access-token-secret'], 422)]);
@@ -97,6 +160,17 @@ final class SyncPermissionsCommandTest extends TestCase
             $this->assertSame('Permission catalog sync failed.', $exception->getMessage());
             $this->assertStringNotContainsString('access-token-secret', $exception->getMessage());
         }
+    }
+
+    public function test_published_permission_config_has_a_valid_empty_shape(): void
+    {
+        $catalog = require dirname(__DIR__).'/config/permissions.php';
+
+        $this->assertSame([
+            'permissions' => [],
+            'roles' => [],
+            'default_role' => null,
+        ], $catalog);
     }
 
     /** @return array{permissions: array<int, array{slug: string, display_name: string}>, roles: array<int, array{role: string, permissions: array<int, string>}>, default_role: string} */

@@ -106,6 +106,10 @@ final class SyncPermissionsCommand extends Command
                 return "Permission at index {$index} must have a non-empty string slug.";
             }
 
+            if (preg_match('/^[a-z0-9][a-z0-9._-]*$/', $slug) !== 1) {
+                return "Permission slug [{$slug}] has an invalid format.";
+            }
+
             if (isset($slugs[$slug])) {
                 return "Permission slug [{$slug}] is duplicated.";
             }

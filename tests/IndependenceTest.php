@@ -77,4 +77,11 @@ final class IndependenceTest extends TestCase
         $this->assertArrayHasKey('dxs:sync-permissions', $this->app[Kernel::class]->all());
         $this->assertTrue(class_exists(SyncPermissionsCommand::class));
     }
+
+    public function test_it_merges_the_default_permission_catalog_without_publishing_config(): void
+    {
+        $this->assertSame([], config('permissions.permissions'));
+        $this->assertSame([], config('permissions.roles'));
+        $this->assertNull(config('permissions.default_role'));
+    }
 }
