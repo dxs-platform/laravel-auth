@@ -18,6 +18,10 @@ return [
     'client_id' => env('SSO_CLIENT_ID', ''),
     'client_secret' => env('SSO_CLIENT_SECRET', ''),
 
+    // Fixed context for a single-tenant downstream. Multi-tenant downstreams
+    // receive this UUID on the platform launch URL and relay it server-side.
+    'organization_context_id' => env('SSO_ORGANIZATION_CONTEXT_ID', ''),
+
     // Must exactly match one of the instance's allowed_redirect_uris on the platform.
     'redirect_uri' => env('SSO_REDIRECT_URI', env('APP_URL').'/auth/callback'),
 

@@ -28,9 +28,14 @@ SSO_ISSUER=https://platform.godx.jp        # IdP origin; everything else is disc
 SSO_SERVICE_SLUG=my-service                 # token `aud` — this ServiceInstance
 SSO_CLIENT_ID=ci_xxx
 SSO_CLIENT_SECRET=sk_xxx
+SSO_ORGANIZATION_CONTEXT_ID=00000000-0000-4000-8000-000000000000 # fixed only for single-tenant services
 SSO_REDIRECT_URI=https://my-service.example/auth/callback
 # optional: SSO_SCOPES, SSO_ROUTES_PREFIX, SSO_TOKEN_COOKIE, SSO_AFTER_LOGIN, ...
 ```
+
+For a multi-tenant downstream, the platform launcher supplies
+`organization_context_id` on the downstream URL. The package validates, stores,
+and relays that context to the IdP authorization endpoint.
 
 ## Wire the one app-specific touch-point
 
