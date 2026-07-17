@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dxs\Auth\Http\Controllers;
 
-use Dxs\Auth\Exceptions\SsoException;
+use Dxs\Auth\Exceptions\SsoConfigurationException;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Support\Pkce;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +29,7 @@ final class SsoRedirectController
             : (is_string($requestedOrganizationContextId) ? $requestedOrganizationContextId : '');
 
         if (! Str::isUuid($organizationContextId)) {
-            throw new SsoException('A valid organization context is required to start SSO.');
+            throw new SsoConfigurationException('A valid organization context is required to start SSO.');
         }
 
         $returnPath = $this->safeReturnPath($request->query('return'));

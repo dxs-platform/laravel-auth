@@ -30,6 +30,13 @@ return [
      */
     'organization_id' => env('SSO_ORGANIZATION_ID', ''),
 
+    /*
+     * Where a failed SSO flow (denied consent, expired state, unreachable IdP)
+     * redirects the user, with the error message flashed under `sso.error`.
+     * Falls back to `after_logout`, then `/`.
+     */
+    'failure_redirect' => env('SSO_FAILURE_REDIRECT', ''),
+
     // Must exactly match one of the instance's allowed_redirect_uris on the platform.
     'redirect_uri' => env('SSO_REDIRECT_URI', env('APP_URL').'/auth/callback'),
 
