@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth;
 
 use Dxs\Auth\Services\PermissionClient;
+use Dxs\Auth\Services\TokenRefresher;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\Auth;
  */
 final class SsoManager
 {
-    public function __construct(private readonly PermissionClient $permissions) {}
+    public function __construct(
+        private readonly PermissionClient $permissions,
+        private readonly TokenRefresher $refresher,
+    ) {}
 
     /** The currently authenticated user, if any. */
     public function user(): ?Authenticatable
@@ -124,6 +128,8 @@ final class SsoManager
         if ($user === null) {
             return null;
         }
+
+        $this->refresher->ensureFresh($user);
 
         $token = data_get($user, 'console_access_token');
         $organization = data_get($user, 'console_organization_id');

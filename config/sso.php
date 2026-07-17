@@ -138,6 +138,17 @@ return [
         'strict' => (bool) env('SSO_PERMISSIONS_STRICT', false),
     ],
 
+    /*
+     * Access tokens are short-lived but the session outlives them. When a
+     * stored token is within `leeway` seconds of expiry, it is refreshed in
+     * place from the stored refresh token before the next authorization read,
+     * so a session never silently loses access at the access-token TTL.
+     */
+    'refresh' => [
+        'enabled' => (bool) env('SSO_REFRESH_ENABLED', true),
+        'leeway' => (int) env('SSO_REFRESH_LEEWAY', 60),
+    ],
+
     'provisioner' => [
         'model' => env('SSO_PROVISIONER_MODEL'),
     ],
