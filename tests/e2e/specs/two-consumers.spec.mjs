@@ -6,7 +6,9 @@ import { startFakeIdp } from '../support/fake-idp.mjs';
 import { startConsumer, waitForUrl } from '../support/processes.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const fixtures = path.resolve(here, '../fixtures');
+const fixtures = process.env.E2E_FIXTURES_DIR
+  ? path.resolve(process.env.E2E_FIXTURES_DIR)
+  : path.resolve(here, '../fixtures');
 let idp;
 let consumerA;
 let consumerB;
@@ -104,5 +106,5 @@ test('wrong state, callback replay, and organization-claim substitution fail clo
     page.getByRole('button', { name: 'Tamper organization claim' }).click(),
   ]);
   expect(tampered[0].status()).toBe(500);
-  await expect(page.getByText(/organization context mismatch/i)).toBeVisible();
+  await expect(page.getByText(/organization context (does not match|mismatch)/i)).toBeVisible();
 });

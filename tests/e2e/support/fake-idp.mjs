@@ -86,6 +86,7 @@ export async function startFakeIdp() {
       const now = Math.floor(Date.now() / 1000);
       return sendJson(response, 200, {
         access_token: jwt({ iss: issuer, aud: client.slug, sub: 'e2e-user', iat: now, exp: now + 900, organization_context_id: grant.tokenOrganization }),
+        id_token: jwt({ iss: issuer, aud: client.slug, sub: 'e2e-user', iat: now, exp: now + 900, nonce: grant.nonce }),
         token_type: 'Bearer',
         expires_in: 900,
       });
