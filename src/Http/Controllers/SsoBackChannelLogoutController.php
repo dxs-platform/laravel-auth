@@ -19,18 +19,21 @@ final class SsoBackChannelLogoutController
     ): Response {
         $logoutToken = $request->input('logout_token');
         if (! is_string($logoutToken) || $logoutToken === '') {
-            return response()->json(['error' => 'invalid_request'], 400);
+            return response()->json(['error' => 'invalid_request'], 400)
+                ->header('Cache-Control', 'no-store');
         }
 
         try {
             $claims = $verifier->verifyLogoutToken($logoutToken);
         } catch (SsoException) {
-            return response()->json(['error' => 'invalid_logout_token'], 400);
+            return response()->json(['error' => 'invalid_logout_token'], 400)
+                ->header('Cache-Control', 'no-store');
         }
 
         $sessionLineage = $claims['sid'] ?? null;
         if (! is_string($sessionLineage) || $sessionLineage === '') {
-            return response()->json(['error' => 'subject_logout_not_supported'], 400);
+            return response()->json(['error' => 'subject_logout_not_supported'], 400)
+                ->header('Cache-Control', 'no-store');
         }
 
         $registration = $sessions->revoke($sessionLineage);
@@ -38,6 +41,6 @@ final class SsoBackChannelLogoutController
             $request->session()->getHandler()->destroy($registration['session_id']);
         }
 
-        return response('', 200);
+        return response('', 200)->header('Cache-Control', 'no-store');
     }
 }

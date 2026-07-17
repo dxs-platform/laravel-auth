@@ -33,6 +33,7 @@ final class SsoRedirectController
         }
 
         $returnPath = $this->safeReturnPath($request->query('return'));
+        $this->pruneExpiredTransactions($request);
         $request->session()->put("sso.transactions.{$state}", [
             'verifier' => $pkce['verifier'],
             'nonce' => $nonce,
@@ -55,6 +56,29 @@ final class SsoRedirectController
         ]);
 
         return redirect()->away($discovery->authorizationEndpoint().'?'.$query);
+    }
+
+    /**
+     * Drop transactions older than the authorization-request TTL so abandoned
+     * tabs neither bloat the session nor widen the replay window.
+     */
+    private function pruneExpiredTransactions(Request $request): void
+    {
+        $transactions = $request->session()->get('sso.transactions', []);
+        if (! is_array($transactions) || $transactions === []) {
+            return;
+        }
+
+        $ttl = (int) config('sso.transaction_ttl', 600);
+        $oldestAcceptable = now()->timestamp - $ttl;
+
+        $fresh = array_filter(
+            $transactions,
+            fn (mixed $transaction): bool => is_array($transaction)
+                && (int) ($transaction['created_at'] ?? 0) >= $oldestAcceptable,
+        );
+
+        $request->session()->put('sso.transactions', $fresh);
     }
 
     private function safeReturnPath(mixed $returnPath): ?string

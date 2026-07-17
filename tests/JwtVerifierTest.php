@@ -158,7 +158,7 @@ final class JwtVerifierTest extends TestCase
             'sub' => 'attacker',
             'iat' => $now,
             'exp' => $now + 300,
-        ], str_repeat('attacker-controlled-secret', 4), 'HS256', 'package-test-key');
+        ], str_repeat('attacker-controlled-secret', 4), 'HS256', 'package-test-key', ['typ' => 'at+jwt']);
 
         $this->expectException(SsoException::class);
         $this->expectExceptionMessage('signature/expiry validation failed');

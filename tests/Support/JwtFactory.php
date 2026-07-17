@@ -43,8 +43,11 @@ final class JwtFactory
         ];
     }
 
-    /** @param array<string, mixed> $claims */
-    public function token(array $claims = [], ?string $keyId = null): string
+    /**
+     * @param  array<string, mixed>  $claims
+     * @param  array<string, mixed>  $headers
+     */
+    public function token(array $claims = [], ?string $keyId = null, array $headers = []): string
     {
         $now = time();
 
@@ -55,7 +58,7 @@ final class JwtFactory
             'iat' => $now,
             'nbf' => $now - 1,
             'exp' => $now + 300,
-        ], $claims), $this->privateKey, 'RS256', $keyId ?? $this->keyId);
+        ], $claims), $this->privateKey, 'RS256', $keyId ?? $this->keyId, array_merge(['typ' => 'at+jwt'], $headers));
     }
 
     /** @return array{keys: array<int, array<string, mixed>>} */

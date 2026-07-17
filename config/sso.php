@@ -37,6 +37,13 @@ return [
      */
     'failure_redirect' => env('SSO_FAILURE_REDIRECT', ''),
 
+    /*
+     * Lifetime (seconds) of a pending authorization transaction — the window
+     * between /auth/redirect and /auth/callback. Expired transactions are
+     * rejected at the callback and pruned from the session.
+     */
+    'transaction_ttl' => (int) env('SSO_TRANSACTION_TTL', 600),
+
     // Must exactly match one of the instance's allowed_redirect_uris on the platform.
     'redirect_uri' => env('SSO_REDIRECT_URI', env('APP_URL').'/auth/callback'),
 

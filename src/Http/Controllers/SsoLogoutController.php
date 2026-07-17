@@ -25,8 +25,25 @@ final class SsoLogoutController
         $forget = Cookie::forget((string) config('sso.token_cookie'));
         $end = $discovery->endSessionEndpoint();
 
-        $target = $end ?? (string) config('sso.after_logout');
+        $target = $end !== null
+            ? $this->endSessionUrl($end)
+            : (string) config('sso.after_logout');
 
         return redirect()->to($target)->withCookie($forget);
+    }
+
+    /**
+     * OIDC RP-Initiated Logout 1.0 — identify the RP (`client_id`) and where
+     * the IdP may send the browser afterwards (`post_logout_redirect_uri`,
+     * as an absolute URL of the local after-logout destination).
+     */
+    private function endSessionUrl(string $endSessionEndpoint): string
+    {
+        $query = http_build_query([
+            'client_id' => (string) config('sso.client_id'),
+            'post_logout_redirect_uri' => url((string) config('sso.after_logout')),
+        ]);
+
+        return $endSessionEndpoint.(str_contains($endSessionEndpoint, '?') ? '&' : '?').$query;
     }
 }
