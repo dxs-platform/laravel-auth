@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Services;
 
 use Dxs\Auth\Exceptions\SsoException;
-use Illuminate\Support\Facades\Cache;
+use Dxs\Auth\Support\SsoCache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -18,7 +18,7 @@ final class OidcDiscovery
     /** @return array<string, mixed> */
     public function document(): array
     {
-        return Cache::remember($this->cacheKey('discovery'), (int) config('sso.discovery_ttl'), function (): array {
+        return SsoCache::store()->remember($this->cacheKey('discovery'), (int) config('sso.discovery_ttl'), function (): array {
             $url = rtrim((string) config('sso.issuer'), '/').'/.well-known/openid-configuration';
             $response = Http::timeout((int) config('sso.http_timeout'))->acceptJson()->get($url);
 
@@ -67,10 +67,10 @@ final class OidcDiscovery
         $cacheKey = $this->cacheKey('jwks');
 
         if ($fresh) {
-            Cache::forget($cacheKey);
+            SsoCache::store()->forget($cacheKey);
         }
 
-        return Cache::remember($cacheKey, (int) config('sso.discovery_ttl'), function (): array {
+        return SsoCache::store()->remember($cacheKey, $this->jwksTtl(), function (): array {
             $response = Http::timeout((int) config('sso.http_timeout'))->acceptJson()->get($this->jwksUri());
 
             if ($response->failed()) {
@@ -101,6 +101,17 @@ final class OidcDiscovery
     {
         $issuer = rtrim((string) config('sso.issuer'), '/');
 
-        return 'sso:'.hash('sha256', $issuer).':'.$resource;
+        return SsoCache::key(hash('sha256', $issuer).':'.$resource);
+    }
+
+    /**
+     * JWKS may rotate faster than the discovery document — give it its own
+     * TTL (`sso.cache.jwks_ttl`), falling back to the discovery TTL.
+     */
+    private function jwksTtl(): int
+    {
+        $ttl = (int) config('sso.cache.jwks_ttl', 0);
+
+        return $ttl > 0 ? $ttl : (int) config('sso.discovery_ttl');
     }
 }

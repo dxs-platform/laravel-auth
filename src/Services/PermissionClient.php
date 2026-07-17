@@ -6,7 +6,7 @@ namespace Dxs\Auth\Services;
 
 use Dxs\Auth\Exceptions\SsoException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
+use Dxs\Auth\Support\SsoCache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -29,9 +29,11 @@ final class PermissionClient
      */
     public function fetch(string $accessToken, string $organizationId, ?string $branchId = null): array
     {
-        $key = 'sso:perms:'.sha1($accessToken.'|'.$organizationId.'|'.((string) $branchId));
+        $tokenHash = hash('sha256', $accessToken);
+        $key = SsoCache::key('perms:'.$tokenHash.':'.sha1($organizationId.'|'.((string) $branchId)));
+        $this->indexKey($tokenHash, $key);
 
-        return Cache::remember($key, (int) config('sso.permissions_ttl', 300), function () use ($accessToken, $organizationId, $branchId): array {
+        return SsoCache::store()->remember($key, (int) config('sso.permissions_ttl', 300), function () use ($accessToken, $organizationId, $branchId): array {
             $url = rtrim((string) config('sso.issuer'), '/').'/'.ltrim((string) config('sso.permissions_path', 'api/sso/me/permissions'), '/');
 
             $response = Http::withToken($accessToken)
@@ -53,6 +55,36 @@ final class PermissionClient
                 'roles' => array_values($data['roles'] ?? []),
             ];
         });
+    }
+
+    /**
+     * Drop every cached permission list for a bearer (all org/branch
+     * contexts). Called on local logout and back-channel logout so a revoked
+     * token cannot keep answering Gate checks from cache.
+     */
+    public static function forgetForTokenHash(string $tokenHash): void
+    {
+        $store = SsoCache::store();
+        $indexKey = SsoCache::key('perms-index:'.$tokenHash);
+
+        foreach ((array) $store->pull($indexKey, []) as $key) {
+            if (is_string($key)) {
+                $store->forget($key);
+            }
+        }
+    }
+
+    /** Track which permission keys exist for a token, for later invalidation. */
+    private function indexKey(string $tokenHash, string $key): void
+    {
+        $store = SsoCache::store();
+        $indexKey = SsoCache::key('perms-index:'.$tokenHash);
+        $index = (array) $store->get($indexKey, []);
+
+        if (! in_array($key, $index, true)) {
+            $index[] = $key;
+            $store->put($indexKey, $index, (int) config('sso.permissions_ttl', 300));
+        }
     }
 
     /** @return Collection<int, string> */

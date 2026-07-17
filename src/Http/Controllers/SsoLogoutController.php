@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Http\Controllers;
 
 use Dxs\Auth\Services\OidcDiscovery;
+use Dxs\Auth\Services\PermissionClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
@@ -18,6 +19,11 @@ final class SsoLogoutController
 {
     public function __invoke(Request $request, OidcDiscovery $discovery): Response
     {
+        $bearer = $request->cookie((string) config('sso.token_cookie'));
+        if (is_string($bearer) && $bearer !== '') {
+            PermissionClient::forgetForTokenHash(hash('sha256', $bearer));
+        }
+
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

@@ -44,6 +44,34 @@ return [
      */
     'transaction_ttl' => (int) env('SSO_TRANSACTION_TTL', 600),
 
+    /*
+     * Where and how the package caches (discovery, JWKS, permissions, the
+     * back-channel logout registry). `store` names a store from
+     * config/cache.php — point it at a SHARED store (redis) in multi-node
+     * deployments so logout revocation and permission invalidation reach
+     * every node; null uses the app default. `jwks_ttl` (seconds) lets JWKS
+     * rotate faster than the discovery document; 0 falls back to
+     * `discovery_ttl`.
+     */
+    'cache' => [
+        'store' => env('SSO_CACHE_STORE'),
+        'prefix' => env('SSO_CACHE_PREFIX', 'sso'),
+        'jwks_ttl' => (int) env('SSO_JWKS_TTL', 0),
+    ],
+
+    /*
+     * Opt-in scheduled pushes of config/authz.php to the platform.
+     * `schedule` accepts a scheduler preset (`daily`, `hourly`, …) or a cron
+     * expression. The scheduled run uses --if-changed, so unchanged catalogs
+     * cost nothing.
+     */
+    'sync' => [
+        'authz' => [
+            'auto' => (bool) env('SSO_SYNC_AUTHZ_AUTO', false),
+            'schedule' => env('SSO_SYNC_AUTHZ_SCHEDULE', 'daily'),
+        ],
+    ],
+
     // Must exactly match one of the instance's allowed_redirect_uris on the platform.
     'redirect_uri' => env('SSO_REDIRECT_URI', env('APP_URL').'/auth/callback'),
 

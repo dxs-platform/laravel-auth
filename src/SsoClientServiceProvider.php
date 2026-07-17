@@ -12,6 +12,7 @@ use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
 use Dxs\Auth\Services\TokenExchanger;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
@@ -41,6 +42,27 @@ final class SsoClientServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([SyncAuthzCommand::class]);
         }
+
+        // Opt-in scheduled catalog sync: `sso.sync.authz.auto` puts
+        // `dxs:sync-authz --if-changed` on the scheduler at the configured
+        // frequency (a preset like `daily`/`hourly`, or a cron expression),
+        // so the platform converges on config/authz.php without manual runs.
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            if (! (bool) config('sso.sync.authz.auto')) {
+                return;
+            }
+
+            $event = $schedule->command('dxs:sync-authz --if-changed');
+            $frequency = (string) config('sso.sync.authz.schedule', 'daily');
+
+            if (str_contains($frequency, ' ')) {
+                $event->cron($frequency);
+            } elseif (method_exists($event, $frequency)) {
+                $event->{$frequency}();
+            } else {
+                $event->daily();
+            }
+        });
 
         // `sso.auth` — validate a platform-issued bearer JWT (JWKS/aud/exp) and
         // resolve the local user. Replaces the gateway header-trust middleware.
