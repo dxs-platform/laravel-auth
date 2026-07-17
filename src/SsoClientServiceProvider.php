@@ -30,6 +30,7 @@ final class SsoClientServiceProvider extends ServiceProvider
         $this->app->singleton(JwtVerifier::class);
         $this->app->singleton(LogoutSessionRegistry::class);
         $this->app->singleton(TokenExchanger::class);
+        $this->app->singleton(\Dxs\Auth\Services\TokenRefresher::class);
         $this->app->singleton(PermissionClient::class);
         $this->app->singleton(\Dxs\Auth\SsoManager::class);
     }
@@ -95,6 +96,12 @@ final class SsoClientServiceProvider extends ServiceProvider
             $org = data_get($user, 'console_organization_id');
 
             if (! is_string($token) || $token === '' || ! is_string($org) || $org === '') {
+                return null;
+            }
+
+            $this->app->make(\Dxs\Auth\Services\TokenRefresher::class)->ensureFresh($user);
+            $token = data_get($user, 'console_access_token');
+            if (! is_string($token) || $token === '') {
                 return null;
             }
 
