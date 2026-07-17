@@ -25,9 +25,9 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  consumerA.stop();
-  consumerB.stop();
-  await idp.close();
+  consumerA?.stop();
+  consumerB?.stop();
+  await idp?.close();
 });
 
 async function login(page, origin, expectedService, organization = idp.organizationA) {

@@ -64,10 +64,7 @@ final class SsoCallbackControllerTest extends TestCase
 
         $response->assertRedirect('/protected?tab=security');
         $response->assertCookie('token', $accessToken);
-        $response->assertSessionMissing('sso.state');
-        $response->assertSessionMissing('sso.verifier');
-        $response->assertSessionMissing('sso.nonce');
-        $response->assertSessionMissing('sso.organization_context_id');
+        $response->assertSessionMissing('sso.transactions.bound-state');
         $this->assertSame('user-1', $this->provisioner->claims['sub']);
         $this->assertSame($accessToken, $this->provisioner->tokens['access_token']);
         Http::assertSent(fn (Request $request): bool => $request->url() === 'https://id.example.test/api/sso/token'
@@ -77,7 +74,7 @@ final class SsoCallbackControllerTest extends TestCase
             && $request['redirect_uri'] === 'https://consumer-a.example.test/auth/callback');
     }
 
-    public function test_state_mismatch_consumes_the_transaction_without_contacting_the_token_endpoint(): void
+    public function test_unknown_state_does_not_consume_an_independent_transaction_or_contact_the_token_endpoint(): void
     {
         Http::fake();
 
@@ -91,9 +88,7 @@ final class SsoCallbackControllerTest extends TestCase
         }
 
         Http::assertNothingSent();
-        $this->assertNull(session('sso.state'));
-        $this->assertNull(session('sso.verifier'));
-        $this->assertNull(session('sso.nonce'));
+        $this->assertSame('bound-verifier', session('sso.transactions.bound-state.verifier'));
     }
 
     public function test_an_authorization_error_must_have_valid_state_and_consumes_the_transaction(): void
@@ -113,7 +108,7 @@ final class SsoCallbackControllerTest extends TestCase
         }
 
         Http::assertNothingSent();
-        $this->assertNull(session('sso.state'));
+        $this->assertNull(session('sso.transactions.bound-state'));
     }
 
     public function test_an_authorization_error_cannot_bypass_state_validation(): void
@@ -226,11 +221,15 @@ final class SsoCallbackControllerTest extends TestCase
     private function boundSession(): array
     {
         return [
-            'sso.state' => 'bound-state',
-            'sso.verifier' => 'bound-verifier',
-            'sso.nonce' => 'bound-nonce',
-            'sso.organization_context_id' => self::ORGANIZATION_CONTEXT_ID,
-            'sso.return' => '/protected?tab=security',
+            'sso.transactions' => [
+                'bound-state' => [
+                    'verifier' => 'bound-verifier',
+                    'nonce' => 'bound-nonce',
+                    'organization_context_id' => self::ORGANIZATION_CONTEXT_ID,
+                    'return' => '/protected?tab=security',
+                    'created_at' => now()->timestamp,
+                ],
+            ],
         ];
     }
 
