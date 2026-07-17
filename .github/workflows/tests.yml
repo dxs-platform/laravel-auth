@@ -1,7 +1,6 @@
 name: Package tests
 
 on:
-  pull_request:
   push:
     branches: [main]
 
@@ -10,19 +9,15 @@ permissions:
 
 jobs:
   test:
-    name: PHP ${{ matrix.php }}
+    name: PHP 8.4
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['8.3', '8.4']
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           coverage: none
           tools: composer:v2
 
