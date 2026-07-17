@@ -8,6 +8,7 @@ use Dxs\Auth\Exceptions\SsoException;
 use Illuminate\Support\Collection;
 use Dxs\Auth\Support\SsoCache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Consumes the platform's authoritative permission read model. Authorization
@@ -91,5 +92,38 @@ final class PermissionClient
     public function permissionsFor(string $accessToken, string $organizationId, ?string $branchId = null): Collection
     {
         return collect($this->fetch($accessToken, $organizationId, $branchId)['permissions']);
+    }
+
+    /**
+     * Read the permission list for an AUTHORIZATION DECISION — resilient by
+     * design. When the platform is briefly unreachable a Gate check or the
+     * Sso facade must not blow up the page (the SsoException is renderable and
+     * would 302 the whole response to the login-failure destination). Instead
+     * we fail CLOSED: log a warning and return an empty list, so the missing
+     * permission is denied rather than the user bounced. Set
+     * `sso.permissions.strict` to rethrow (e.g. to surface outages loudly in a
+     * job) — the raw fetch()/permissionsFor() always throw for callers that
+     * want to handle it themselves.
+     *
+     * @return array{permissions: Collection<int, string>, roles: list<array<string, mixed>>}
+     */
+    public function resolveFor(string $accessToken, string $organizationId, ?string $branchId = null): array
+    {
+        try {
+            $result = $this->fetch($accessToken, $organizationId, $branchId);
+
+            return [
+                'permissions' => collect($result['permissions']),
+                'roles' => $result['roles'],
+            ];
+        } catch (SsoException $exception) {
+            if ((bool) config('sso.permissions.strict', false)) {
+                throw $exception;
+            }
+
+            Log::warning('SSO permission fetch failed — denying (fail-closed): '.$exception->getMessage());
+
+            return ['permissions' => collect(), 'roles' => []];
+        }
     }
 }

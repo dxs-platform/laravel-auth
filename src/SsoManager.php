@@ -48,7 +48,7 @@ final class SsoManager
             return collect();
         }
 
-        return $this->permissions->permissionsFor($context['token'], $context['organization'], $context['branch']);
+        return $this->permissions->resolveFor($context['token'], $context['organization'], $context['branch'])['permissions'];
     }
 
     /**
@@ -64,7 +64,7 @@ final class SsoManager
             return [];
         }
 
-        return $this->permissions->fetch($context['token'], $context['organization'], $context['branch'])['roles'];
+        return $this->permissions->resolveFor($context['token'], $context['organization'], $context['branch'])['roles'];
     }
 
     /** True when the current user holds the given platform permission. */

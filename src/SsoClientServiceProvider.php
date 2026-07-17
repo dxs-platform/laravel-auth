@@ -102,7 +102,7 @@ final class SsoClientServiceProvider extends ServiceProvider
             $branch = is_string($branch) && $branch !== '' ? $branch : null;
 
             return $this->app->make(PermissionClient::class)
-                ->permissionsFor($token, $org, $branch)
+                ->resolveFor($token, $org, $branch)['permissions']
                 ->contains($ability) ? true : null;
         });
 
