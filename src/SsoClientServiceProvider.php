@@ -19,6 +19,7 @@ use Dxs\Auth\Services\TokenExchanger;
 use Dxs\Auth\Services\TokenRefresher;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -133,7 +134,13 @@ final class SsoClientServiceProvider extends ServiceProvider
         if (config('sso.routes.enabled') && config('sso.routes.login_redirect', true)) {
             $this->app->booted(function () use ($router): void {
                 if (! $router->getRoutes()->hasNamedRoute('login')) {
-                    $router->get('/login', fn () => redirect()->route('sso.redirect'))
+                    $router->get('/login', function (Request $request) {
+                        $returnPath = $request->query('return');
+
+                        return redirect()->route('sso.redirect', is_string($returnPath)
+                            ? ['return' => $returnPath]
+                            : []);
+                    })
                         ->middleware('web')
                         ->name('login');
                 }

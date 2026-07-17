@@ -151,6 +151,9 @@ final class TurnkeyInstallTest extends TestCase
     public function test_a_named_login_route_falls_back_into_the_sso_redirect(): void
     {
         $this->get('/login')->assertRedirect(route('sso.redirect'));
+        $this->get('/login?return=%2F')->assertRedirect(route('sso.redirect', ['return' => '/']));
+        $this->get('/login?return=https%3A%2F%2Fevil.example')
+            ->assertRedirect(route('sso.redirect', ['return' => 'https://evil.example']));
         $this->assertTrue($this->app['router']->getRoutes()->hasNamedRoute('login'));
     }
 
