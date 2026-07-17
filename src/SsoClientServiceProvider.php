@@ -12,6 +12,7 @@ use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
 use Dxs\Auth\Services\TokenExchanger;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +25,7 @@ final class SsoClientServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/sso.php', 'sso');
         $this->mergeConfigFrom(__DIR__.'/../config/authz.php', 'authz');
 
+        $this->app->singletonIf(\Dxs\Auth\Contracts\ProvisionsUsers::class, \Dxs\Auth\Provisioning\DatabaseUserProvisioner::class);
         $this->app->singleton(OidcDiscovery::class);
         $this->app->singleton(JwtVerifier::class);
         $this->app->singleton(LogoutSessionRegistry::class);
@@ -38,9 +40,42 @@ final class SsoClientServiceProvider extends ServiceProvider
             __DIR__.'/../config/authz.php' => config_path('authz.php'),
         ], 'sso-config');
 
+        $this->publishes([
+            __DIR__.'/../database/migrations/add_sso_identity_columns_to_users_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_add_sso_identity_columns_to_users_table.php'),
+        ], 'sso-migrations');
+
+        $this->publishes([
+            __DIR__.'/../stubs/authz.php.stub' => config_path('authz.php'),
+        ], 'sso-authz');
+
+        $this->publishes([
+            __DIR__.'/../stubs/UserProvisioner.php.stub' => app_path('Sso/UserProvisioner.php'),
+        ], 'sso-provisioner');
+
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncAuthzCommand::class]);
+            $this->commands([SyncAuthzCommand::class, \Dxs\Auth\Console\InstallCommand::class]);
         }
+
+        // Opt-in scheduled catalog sync: `sso.sync.authz.auto` puts
+        // `dxs:sync-authz --if-changed` on the scheduler at the configured
+        // frequency (a preset like `daily`/`hourly`, or a cron expression),
+        // so the platform converges on config/authz.php without manual runs.
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            if (! (bool) config('sso.sync.authz.auto')) {
+                return;
+            }
+
+            $event = $schedule->command('dxs:sync-authz --if-changed');
+            $frequency = (string) config('sso.sync.authz.schedule', 'daily');
+
+            if (str_contains($frequency, ' ')) {
+                $event->cron($frequency);
+            } elseif (method_exists($event, $frequency)) {
+                $event->{$frequency}();
+            } else {
+                $event->daily();
+            }
+        });
 
         // `sso.auth` — validate a platform-issued bearer JWT (JWKS/aud/exp) and
         // resolve the local user. Replaces the gateway header-trust middleware.
@@ -69,6 +104,18 @@ final class SsoClientServiceProvider extends ServiceProvider
                 ->permissionsFor($token, $org, $branch)
                 ->contains($ability) ? true : null;
         });
+
+        // Guests bounced by Laravel's `auth` middleware land on route('login');
+        // register the SSO fallback unless the app defines its own.
+        if (config('sso.routes.enabled') && config('sso.routes.login_redirect', true)) {
+            $this->app->booted(function () use ($router): void {
+                if (! $router->getRoutes()->hasNamedRoute('login')) {
+                    $router->get('/login', fn () => redirect()->route('sso.redirect'))
+                        ->middleware('web')
+                        ->name('login');
+                }
+            });
+        }
 
         if (config('sso.routes.enabled')) {
             $router->group([

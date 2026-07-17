@@ -6,6 +6,7 @@ namespace Dxs\Auth\Console;
 
 use Dxs\Auth\Exceptions\SsoException;
 use Illuminate\Console\Command;
+use Dxs\Auth\Support\SsoCache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\Http;
  */
 final class SyncAuthzCommand extends Command
 {
-    protected $signature = 'dxs:sync-authz {--dry-run : Print the payload without sending}';
+    protected $signature = 'dxs:sync-authz {--dry-run : Print the payload without sending} {--if-changed : Skip when the catalog matches the last successful sync}';
 
     protected $description = 'Sync this service\'s authorization catalog to the GoDX ID platform';
 
@@ -65,6 +66,14 @@ final class SyncAuthzCommand extends Command
             return self::SUCCESS;
         }
 
+        $catalogHash = hash('sha256', json_encode([$service, config('sso.issuer'), $catalog], JSON_THROW_ON_ERROR));
+        $hashKey = SsoCache::key('authz-sync:'.$service);
+        if ($this->option('if-changed') && SsoCache::store()->get($hashKey) === $catalogHash) {
+            $this->info('Catalog unchanged since the last successful sync — skipping.');
+
+            return self::SUCCESS;
+        }
+
         $token = (string) config('sso.admin_token');
         if ($token === '') {
             $this->error('SSO_ADMIN_TOKEN is not set — an admin bearer with `catalog.authz.manage` is required.');
@@ -86,6 +95,7 @@ final class SyncAuthzCommand extends Command
             throw new SsoException('Permission catalog sync failed.');
         }
 
+        SsoCache::store()->forever($hashKey, $catalogHash);
         $this->info("Permission catalog synced ({$count} codes).");
 
         return self::SUCCESS;

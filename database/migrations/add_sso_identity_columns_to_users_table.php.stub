@@ -1,0 +1,54 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Platform SSO identity columns for JIT-provisioned users (published from
+ * dxs/laravel-auth). Idempotent: each column is added only when missing, so
+ * the migration is safe on fresh and existing users tables alike.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table): void {
+            if (! Schema::hasColumn('users', 'console_user_id')) {
+                $table->string('console_user_id', 64)->nullable()->unique()->comment('Platform SSO subject (sub)');
+            }
+            if (! Schema::hasColumn('users', 'console_organization_id')) {
+                $table->uuid('console_organization_id')->nullable();
+            }
+            if (! Schema::hasColumn('users', 'console_access_token')) {
+                $table->text('console_access_token')->nullable();
+            }
+            if (! Schema::hasColumn('users', 'console_refresh_token')) {
+                $table->text('console_refresh_token')->nullable();
+            }
+            if (! Schema::hasColumn('users', 'console_token_expires_at')) {
+                $table->timestamp('console_token_expires_at')->nullable();
+            }
+        });
+
+        // SSO-only users have no local password.
+        if (Schema::hasColumn('users', 'password')) {
+            Schema::table('users', function (Blueprint $table): void {
+                $table->string('password')->nullable()->change();
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table): void {
+            $table->dropColumn([
+                'console_user_id',
+                'console_organization_id',
+                'console_access_token',
+                'console_refresh_token',
+                'console_token_expires_at',
+            ]);
+        });
+    }
+};

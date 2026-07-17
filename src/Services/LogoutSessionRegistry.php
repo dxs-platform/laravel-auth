@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Dxs\Auth\Services;
 
+use Dxs\Auth\Support\SsoCache;
 use Illuminate\Contracts\Cache\Repository;
 
 final class LogoutSessionRegistry
 {
-    public function __construct(private readonly Repository $cache) {}
+    private readonly Repository $cache;
+
+    public function __construct(?Repository $cache = null)
+    {
+        $this->cache = $cache ?? SsoCache::store();
+    }
 
     /** @param array<string, mixed> $claims */
     public function register(array $claims, string $token, string $sessionId): void
@@ -40,6 +46,9 @@ final class LogoutSessionRegistry
         $ttl = max(1, ((int) ($registration['expires_at'] ?? time() + 900)) - time());
         $this->cache->put($this->revokedTokenKey($registration['token_hash']), true, $ttl);
 
+        // The bearer is dead — its cached permission lists must die with it.
+        PermissionClient::forgetForTokenHash($registration['token_hash']);
+
         return $registration;
     }
 
@@ -50,11 +59,11 @@ final class LogoutSessionRegistry
 
     private function sessionKey(string $sessionLineage): string
     {
-        return 'sso:logout-session:'.hash('sha256', (string) config('sso.issuer').'|'.(string) config('sso.service_slug').'|'.$sessionLineage);
+        return SsoCache::key('logout-session:'.hash('sha256', (string) config('sso.issuer').'|'.(string) config('sso.service_slug').'|'.$sessionLineage));
     }
 
     private function revokedTokenKey(string $tokenHash): string
     {
-        return 'sso:revoked-token:'.$tokenHash;
+        return SsoCache::key('revoked-token:'.$tokenHash);
     }
 }

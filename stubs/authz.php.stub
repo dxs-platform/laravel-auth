@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+|--------------------------------------------------------------------------
+| Service authorization catalog (published from dxs/laravel-auth)
+|--------------------------------------------------------------------------
+|
+| Declared here, pushed to the GoDX ID platform via `php artisan
+| dxs:sync-authz` (add --if-changed in schedulers; enable
+| SSO_SYNC_AUTHZ_AUTO to let the package schedule it for you). Extend the
+| permission list as your domain modules land and grant the new slugs to
+| the matching roles. Never sync a literal "*" — every role expands to
+| concrete, declared slugs.
+|
+*/
+
+$permissions = [
+    ['slug' => 'dashboard.view', 'display_name' => 'Dashboard · View', 'group' => 'dashboard'],
+];
+
+$staff = [
+    'dashboard.view',
+];
+
+$admin = array_column($permissions, 'slug');
+
+return [
+    'permissions' => $permissions,
+
+    'roles' => [
+        ['role' => 'staff', 'display_name' => 'Staff', 'level' => 10, 'permissions' => $staff],
+        ['role' => 'admin', 'display_name' => 'Administrator', 'level' => 100, 'permissions' => $admin],
+    ],
+
+    'default_role' => 'staff',
+];
