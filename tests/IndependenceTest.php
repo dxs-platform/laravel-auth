@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dxs\Auth\Tests;
 
-use Dxs\Auth\Console\RegisterPermissionsCommand;
+use Dxs\Auth\Console\SyncPermissionsCommand;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
@@ -73,7 +73,7 @@ final class IndependenceTest extends TestCase
 
     public function test_it_registers_the_permission_manifest_command(): void
     {
-        $this->assertArrayHasKey('dxs-auth:register-permissions', $this->app[\Illuminate\Contracts\Console\Kernel::class]->all());
-        $this->assertTrue(class_exists(RegisterPermissionsCommand::class));
+        $this->assertArrayHasKey('dxs:sync-permissions', $this->app[\Illuminate\Contracts\Console\Kernel::class]->all());
+        $this->assertTrue(class_exists(SyncPermissionsCommand::class));
     }
 }
