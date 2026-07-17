@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dxs\Auth;
 
-use Dxs\Auth\Console\RegisterPermissionsCommand;
+use Dxs\Auth\Console\SyncPermissionsCommand;
 use Dxs\Auth\Http\Middleware\AuthenticateSso;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\LogoutSessionRegistry;
@@ -21,6 +21,7 @@ final class SsoClientServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/sso.php', 'sso');
+        $this->mergeConfigFrom(__DIR__.'/../config/permissions.php', 'permissions');
 
         $this->app->singleton(OidcDiscovery::class);
         $this->app->singleton(JwtVerifier::class);
@@ -31,10 +32,13 @@ final class SsoClientServiceProvider extends ServiceProvider
 
     public function boot(Router $router): void
     {
-        $this->publishes([__DIR__.'/../config/sso.php' => config_path('sso.php')], 'sso-config');
+        $this->publishes([
+            __DIR__.'/../config/sso.php' => config_path('sso.php'),
+            __DIR__.'/../config/permissions.php' => config_path('permissions.php'),
+        ], 'sso-config');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([RegisterPermissionsCommand::class]);
+            $this->commands([SyncPermissionsCommand::class]);
         }
 
         // `sso.auth` — validate a platform-issued bearer JWT (JWKS/aud/exp) and

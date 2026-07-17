@@ -48,17 +48,16 @@ return [
     'permissions_path' => env('SSO_PERMISSIONS_PATH', 'api/sso/me/permissions'),
     'permissions_ttl' => (int) env('SSO_PERMISSIONS_TTL', 300),
 
-    // The service's declared permission catalog (codes), pushed UP to the platform
-    // via `php artisan dxs-auth:register-permissions`. Owned by the service.
-    'service_id' => env('SSO_SERVICE_ID', ''),                  // platform Service id/slug for the admin authz route
-    'admin_token' => env('SSO_ADMIN_TOKEN', ''),               // admin token w/ catalog.authz.manage (CI/operator)
-    'permissions_manifest' => [
-        // 'permissions' => [
-        //     ['code' => 'absences.view', 'name' => 'View absences', 'group' => 'absences'],
-        //     ['code' => 'absences.manage', 'name' => 'Manage absences', 'group' => 'absences'],
-        // ],
-        // 'roles' => [ ['role' => 'admin', 'level' => 100, 'permissions' => ['absences.view','absences.manage']] ],
-    ],
+    /*
+    |--------------------------------------------------------------------------
+    | Catalog registration (push this service's permission codes UP to the IdP)
+    |--------------------------------------------------------------------------
+    | The catalog itself lives in `config/permissions.php` (the service owns it).
+    | `php artisan dxs:sync-permissions` PUTs it to the platform authz endpoint.
+    */
+    'service_id' => env('SSO_SERVICE_ID', ''),                            // {service} for the authz route
+    'admin_token' => env('SSO_ADMIN_TOKEN', ''),                          // bearer w/ catalog.authz.manage
+    'authz_path' => env('SSO_AUTHZ_PATH', 'api/admin/catalog/{service}/authz'),
 
     // Where to send the user after a successful / failed login.
     'after_login' => env('SSO_AFTER_LOGIN', '/'),
