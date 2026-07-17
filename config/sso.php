@@ -128,6 +128,16 @@ return [
      * auth.providers.users.model). Bind your own ProvisionsUsers
      * implementation to take over completely.
      */
+    /*
+     * Authorization-read resilience. By default a Gate check or Sso facade
+     * read fails CLOSED when the platform is unreachable (log + deny) rather
+     * than letting the renderable SsoException hijack the page with a redirect.
+     * Set strict=true to rethrow instead (e.g. in background jobs).
+     */
+    'permissions' => [
+        'strict' => (bool) env('SSO_PERMISSIONS_STRICT', false),
+    ],
+
     'provisioner' => [
         'model' => env('SSO_PROVISIONER_MODEL'),
     ],
