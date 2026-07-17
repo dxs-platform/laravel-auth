@@ -10,7 +10,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase;
 
-final class SyncPermissionsCommandTest extends TestCase
+final class SyncAuthzCommandTest extends TestCase
 {
     protected function getPackageProviders($app): array
     {
@@ -23,19 +23,19 @@ final class SyncPermissionsCommandTest extends TestCase
         $app['config']->set('sso.service_id', 'consumer-a');
         $app['config']->set('sso.admin_token', 'admin-secret');
         $app['config']->set('sso.http_timeout', 5);
-        $app['config']->set('permissions', $this->catalog('consumer-a.read'));
+        $app['config']->set('authz', $this->catalog('consumer-a.read'));
     }
 
     public function test_empty_catalog_is_a_no_op(): void
     {
         Http::fake();
-        config()->set('permissions', [
+        config()->set('authz', [
             'permissions' => [],
             'roles' => [],
             'default_role' => null,
         ]);
 
-        $this->artisan('dxs:sync-permissions')
+        $this->artisan('dxs:sync-authz')
             ->expectsOutputToContain('nothing to sync')
             ->assertSuccessful();
 
@@ -47,7 +47,7 @@ final class SyncPermissionsCommandTest extends TestCase
         Http::fake();
         config()->set('sso.service_id', '');
 
-        $this->artisan('dxs:sync-permissions')->assertFailed();
+        $this->artisan('dxs:sync-authz')->assertFailed();
 
         Http::assertNothingSent();
     }
@@ -56,7 +56,7 @@ final class SyncPermissionsCommandTest extends TestCase
     {
         Http::fake();
 
-        $this->artisan('dxs:sync-permissions', ['--dry-run' => true])
+        $this->artisan('dxs:sync-authz', ['--dry-run' => true])
             ->expectsOutputToContain('consumer-a.read')
             ->assertSuccessful();
 
@@ -74,9 +74,9 @@ final class SyncPermissionsCommandTest extends TestCase
             ['permissions' => [['slug' => 'Invalid Slug']]],
             ['permissions' => [['slug' => 'known']], 'roles' => [], 'default_role' => 'missing'],
         ] as $catalog) {
-            config()->set('permissions', $catalog);
+            config()->set('authz', $catalog);
 
-            $this->artisan('dxs:sync-permissions')->assertFailed();
+            $this->artisan('dxs:sync-authz')->assertFailed();
         }
 
         Http::assertNothingSent();
@@ -87,7 +87,7 @@ final class SyncPermissionsCommandTest extends TestCase
         Http::fake();
         config()->set('sso.admin_token', '');
 
-        $this->artisan('dxs:sync-permissions')->assertFailed();
+        $this->artisan('dxs:sync-authz')->assertFailed();
 
         Http::assertNothingSent();
     }
@@ -96,8 +96,8 @@ final class SyncPermissionsCommandTest extends TestCase
     {
         Http::fake(['*' => Http::response(['registered' => true])]);
 
-        $this->artisan('dxs:sync-permissions')->assertSuccessful();
-        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+        $this->artisan('dxs:sync-authz')->assertSuccessful();
+        $this->artisan('dxs:sync-authz')->assertSuccessful();
 
         Http::assertSentCount(2);
         Http::assertSent(fn (Request $request): bool => $request->method() === 'PUT'
@@ -114,7 +114,7 @@ final class SyncPermissionsCommandTest extends TestCase
         config()->set('sso.service_id', 'payroll.v2-prod');
         config()->set('sso.authz_path', 'api/dev/services/{service}/authz');
 
-        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+        $this->artisan('dxs:sync-authz')->assertSuccessful();
 
         Http::assertSent(fn (Request $request): bool => $request->url() === 'https://id.example.test/api/dev/services/payroll.v2-prod/authz');
     }
@@ -124,11 +124,11 @@ final class SyncPermissionsCommandTest extends TestCase
         Http::fake(['*' => Http::response(['registered' => true])]);
 
         config()->set('sso.service_id', 'service-a');
-        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+        $this->artisan('dxs:sync-authz')->assertSuccessful();
 
         config()->set('sso.service_id', 'service-b');
-        config()->set('permissions', $this->catalog('consumer-b.write'));
-        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+        config()->set('authz', $this->catalog('consumer-b.write'));
+        $this->artisan('dxs:sync-authz')->assertSuccessful();
 
         Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/service-a/authz')
             && $request['permissions'][0]['slug'] === 'consumer-a.read');
@@ -139,11 +139,11 @@ final class SyncPermissionsCommandTest extends TestCase
     public function test_missing_optional_catalog_keys_are_sent_with_platform_defaults(): void
     {
         Http::fake(['*' => Http::response(['registered' => true])]);
-        config()->set('permissions', [
+        config()->set('authz', [
             'permissions' => [['slug' => 'consumer-a.read', 'display_name' => 'Permission']],
         ]);
 
-        $this->artisan('dxs:sync-permissions')->assertSuccessful();
+        $this->artisan('dxs:sync-authz')->assertSuccessful();
 
         Http::assertSent(fn (Request $request): bool => $request['roles'] === []
             && $request['default_role'] === null);
@@ -154,7 +154,7 @@ final class SyncPermissionsCommandTest extends TestCase
         Http::fake(['*' => Http::response(['debug' => 'access-token-secret'], 422)]);
 
         try {
-            $this->artisan('dxs:sync-permissions')->run();
+            $this->artisan('dxs:sync-authz')->run();
             $this->fail('Expected sync failure.');
         } catch (SsoException $exception) {
             $this->assertSame('Permission catalog sync failed.', $exception->getMessage());
@@ -164,7 +164,7 @@ final class SyncPermissionsCommandTest extends TestCase
 
     public function test_published_permission_config_has_a_valid_empty_shape(): void
     {
-        $catalog = require dirname(__DIR__).'/config/permissions.php';
+        $catalog = require dirname(__DIR__).'/config/authz.php';
 
         $this->assertSame([
             'permissions' => [],

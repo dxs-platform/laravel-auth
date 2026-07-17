@@ -52,8 +52,8 @@ return [
     |--------------------------------------------------------------------------
     | Catalog registration (push this service's permission codes UP to the IdP)
     |--------------------------------------------------------------------------
-    | The catalog itself lives in `config/permissions.php` (the service owns it).
-    | `php artisan dxs:sync-permissions` PUTs it to the platform authz endpoint.
+    | The catalog itself lives in `config/authz.php` (the service owns it).
+    | `php artisan dxs:sync-authz` PUTs it to the platform authz endpoint.
     */
     'service_id' => env('SSO_SERVICE_ID', ''),                            // {service} for the authz route
     'admin_token' => env('SSO_ADMIN_TOKEN', ''),                          // bearer w/ catalog.authz.manage

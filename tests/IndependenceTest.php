@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dxs\Auth\Tests;
 
-use Dxs\Auth\Console\SyncPermissionsCommand;
+use Dxs\Auth\Console\SyncAuthzCommand;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Services\PermissionClient;
@@ -72,16 +72,16 @@ final class IndependenceTest extends TestCase
         $this->assertInstanceOf(PermissionClient::class, $this->app->make(PermissionClient::class));
     }
 
-    public function test_it_registers_the_permission_manifest_command(): void
+    public function test_it_registers_the_authz_sync_command(): void
     {
-        $this->assertArrayHasKey('dxs:sync-permissions', $this->app[Kernel::class]->all());
-        $this->assertTrue(class_exists(SyncPermissionsCommand::class));
+        $this->assertArrayHasKey('dxs:sync-authz', $this->app[Kernel::class]->all());
+        $this->assertTrue(class_exists(SyncAuthzCommand::class));
     }
 
-    public function test_it_merges_the_default_permission_catalog_without_publishing_config(): void
+    public function test_it_merges_the_default_authz_catalog_without_publishing_config(): void
     {
-        $this->assertSame([], config('permissions.permissions'));
-        $this->assertSame([], config('permissions.roles'));
-        $this->assertNull(config('permissions.default_role'));
+        $this->assertSame([], config('authz.permissions'));
+        $this->assertSame([], config('authz.roles'));
+        $this->assertNull(config('authz.default_role'));
     }
 }

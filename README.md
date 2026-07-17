@@ -63,7 +63,7 @@ provided.
 | `POST {prefix}/backchannel-logout` | Validate an OIDC logout token and revoke its local session lineage |
 | `sso.auth` middleware    | Validate a platform-issued bearer (JWKS/`aud`/`exp`) and resolve the local user |
 | `Gate::before`           | Grant an ability iff it is in the platform-resolved permission list |
-| `dxs:sync-permissions` | Push this service's declared permission catalog from `config/permissions.php` to the platform |
+| `dxs:sync-authz` | Push this service's declared authorization catalog from `config/authz.php` to the platform |
 
 ## Independence
 

@@ -9,36 +9,36 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Pushes this service's permission catalog UP to the GoDX ID platform, so the
+ * Pushes this service's authorization catalog UP to the GoDX ID platform, so the
  * platform can build roles from the codes and resolve them for users at login.
  *
- *   php artisan dxs:sync-permissions [--dry-run]
+ *   php artisan dxs:sync-authz [--dry-run]
  *
- * The catalog is owned by the service in `config/permissions.php`
+ * The catalog is owned by the service in `config/authz.php`
  * (`permissions`, `roles`, `default_role`). Registration is admin-gated on the
  * platform, so it runs with an admin bearer (SSO_ADMIN_TOKEN) — typically from
  * CI or an operator, not the app runtime. Target:
  * `PUT {issuer}/{authz_path}` with `{service}` = config('sso.service_id').
  */
-final class SyncPermissionsCommand extends Command
+final class SyncAuthzCommand extends Command
 {
-    protected $signature = 'dxs:sync-permissions {--dry-run : Print the payload without sending}';
+    protected $signature = 'dxs:sync-authz {--dry-run : Print the payload without sending}';
 
-    protected $description = 'Sync this service\'s permission catalog to the GoDX ID platform';
+    protected $description = 'Sync this service\'s authorization catalog to the GoDX ID platform';
 
     public function handle(): int
     {
         /** @var array<string, mixed> $catalog */
         $catalog = [
-            'permissions' => config('permissions.permissions', []),
-            'roles' => config('permissions.roles', []),
-            'default_role' => config('permissions.default_role'),
+            'permissions' => config('authz.permissions') ?? [],
+            'roles' => config('authz.roles') ?? [],
+            'default_role' => config('authz.default_role'),
         ];
 
         $count = is_countable($catalog['permissions']) ? count($catalog['permissions']) : 0;
 
         if ($count === 0) {
-            $this->warn('No permissions declared in config/permissions.php — nothing to sync.');
+            $this->warn('No permissions declared in config/authz.php — nothing to sync.');
 
             return self::SUCCESS;
         }

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 /*
 |--------------------------------------------------------------------------
-| Service permission catalog
+| Service authorization catalog
 |--------------------------------------------------------------------------
 | The permission codes THIS service declares. Pushed to the GoDX ID platform
-| with `php artisan dxs:sync-permissions`; the platform builds roles from them
+| with `php artisan dxs:sync-authz`; the platform builds roles from them
 | and resolves them per user at login. The service owns this file.
 |
 | Each permission: ['slug' => 'group.action', 'display_name' => '...', 'group' => '...'].

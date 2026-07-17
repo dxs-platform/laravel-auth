@@ -32,6 +32,33 @@ final class AuthenticateSso
     {
         $token = $request->bearerToken();
 
+        // Dev/test escape hatches — mirror the gateway middleware this replaces.
+        // NEVER active in production (real JWKS-verified bearer only there).
+        if (app()->environment() !== 'production') {
+            // 1. Honour an already-authenticated user (e.g. feature tests using
+            //    Laravel's actingAs() / any prior guard-resolved session user).
+            if (Auth::check()) {
+                return $next($request);
+            }
+
+            // 2. Accept a `Bearer dev:<subject>` token → resolve/JIT-provision the
+            //    local user for that subject with no network round-trip.
+            if (is_string($token) && str_starts_with($token, 'dev:')) {
+                $subject = substr($token, 4);
+
+                if ($subject !== '') {
+                    $user = $this->provisioner->resolveBySubject($subject)
+                        ?? $this->provisioner->provision(['sub' => $subject], ['access_token' => $token]);
+
+                    Auth::setUser($user);
+                    $request->setUserResolver(fn () => $user);
+                    $request->attributes->set('sso_subject', $subject);
+
+                    return $next($request);
+                }
+            }
+        }
+
         if (! is_string($token) || $token === '') {
             return $this->unauthenticated($request);
         }
