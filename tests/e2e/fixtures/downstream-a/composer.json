@@ -3,7 +3,7 @@
   "type": "project",
   "require": {
     "php": "^8.3",
-    "dxs/laravel-auth": "0.2.0",
+    "dxs/laravel-auth": "0.2.1",
     "laravel/framework": "^12.0"
   },
   "repositories": [{ "type": "artifact", "url": "__PACKAGE_ARTIFACTS__" }],

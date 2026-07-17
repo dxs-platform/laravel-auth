@@ -15,9 +15,9 @@ trap cleanup EXIT
 mkdir -p "$PACKAGE"
 git -C "$ROOT" archive HEAD | tar -C "$PACKAGE" -xf -
 mkdir -p "$ARTIFACTS"
-php -r '$path=$argv[1]; $data=json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR); $data["version"]="0.2.0"; file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);' "$PACKAGE/composer.json"
-(cd "$PACKAGE" && zip -q -r "$ARTIFACTS/dxs-laravel-auth-0.2.0.zip" .)
-ARTIFACT_SHA="$(shasum -a 256 "$ARTIFACTS/dxs-laravel-auth-0.2.0.zip" | cut -d' ' -f1)"
+php -r '$path=$argv[1]; $data=json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR); $data["version"]="0.2.1"; file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES).PHP_EOL);' "$PACKAGE/composer.json"
+(cd "$PACKAGE" && zip -q -r "$ARTIFACTS/dxs-laravel-auth-0.2.1.zip" .)
+ARTIFACT_SHA="$(shasum -a 256 "$ARTIFACTS/dxs-laravel-auth-0.2.1.zip" | cut -d' ' -f1)"
 cp -R "$PACKAGE/tests/e2e/fixtures/downstream-a" "$RUNTIME/downstream-a"
 cp -R "$PACKAGE/tests/e2e/fixtures/downstream-b" "$RUNTIME/downstream-b"
 
@@ -28,7 +28,7 @@ for consumer in downstream-a downstream-b; do
   rm "$app/composer.json.bak"
   mkdir -p "$app/storage/framework/cache/data" "$app/storage/framework/sessions" "$app/storage/framework/views" "$app/storage/logs" "$app/bootstrap/cache"
   composer install --working-dir="$app" --no-interaction --prefer-dist --no-progress
-  composer show --working-dir="$app" dxs/laravel-auth --locked | grep -F 'versions : * 0.2.0'
+  composer show --working-dir="$app" dxs/laravel-auth --locked | grep -F 'versions : * 0.2.1'
 done
 
 echo "Immutable package artifact sha256: $ARTIFACT_SHA"
