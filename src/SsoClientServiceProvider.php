@@ -6,6 +6,7 @@ namespace Dxs\Auth;
 
 use Dxs\Auth\Console\SyncAuthzCommand;
 use Dxs\Auth\Http\Middleware\AuthenticateSso;
+use Dxs\Auth\Http\Middleware\AuthorizeSsoPermission;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\LogoutSessionRegistry;
 use Dxs\Auth\Services\OidcDiscovery;
@@ -44,6 +45,11 @@ final class SsoClientServiceProvider extends ServiceProvider
         // `sso.auth` — validate a platform-issued bearer JWT (JWKS/aud/exp) and
         // resolve the local user. Replaces the gateway header-trust middleware.
         $router->aliasMiddleware('sso.auth', AuthenticateSso::class);
+
+        // `sso.can:{ability,…}` — authenticate the bearer AND require every
+        // listed platform ability in one alias, with RFC 6750
+        // `insufficient_scope` semantics on denial.
+        $router->aliasMiddleware('sso.can', AuthorizeSsoPermission::class);
 
         // Authorization DECISIONS stay on the platform: a granted ability is one
         // present in the user's platform-resolved permission list. Explicit

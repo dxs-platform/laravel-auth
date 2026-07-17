@@ -15,6 +15,20 @@ permission list and answers `Gate` from it. The service only declares its permis
 composer require dxs/laravel-auth:^0.4
 ```
 
+## Protecting resource routes
+
+One alias authenticates the platform bearer AND requires abilities, with
+RFC 6750 semantics (401 `invalid_token` vs 403 `insufficient_scope`):
+
+```php
+Route::get('/api/branches/{id}', ...)->middleware('sso.can:branches.view');
+Route::post('/api/branches', ...)->middleware('sso.can:branches.view,branches.create'); // all required
+```
+
+Abilities are answered by the platform-resolved permission list; local
+`Gate::define()` still runs for abilities outside it. Plain `sso.auth` +
+Laravel's `can:` keeps working if you prefer wiring them separately.
+
 > **New to the platform?** Follow the step-by-step [downstream onboarding guide](docs/onboarding.md) —
 > it covers service registration, every env value, the users-table migration, and a
 > symptom→cause debugging map collected from a real integration.
