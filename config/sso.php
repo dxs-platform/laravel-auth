@@ -22,6 +22,11 @@ return [
     // receive this UUID on the platform launch URL and relay it server-side.
     'organization_context_id' => env('SSO_ORGANIZATION_CONTEXT_ID', ''),
 
+    // Multi-tenant downstreams may re-run Authorization Code + PKCE with a
+    // server-validated organization context selected by an authenticated user.
+    // Keep disabled for fixed single-tenant consumers.
+    'allow_organization_switching' => (bool) env('SSO_ALLOW_ORGANIZATION_SWITCHING', false),
+
     /*
      * Internal platform Organization id expected in the access token's
      * `organization_id` claim. The current platform IdP stamps the service

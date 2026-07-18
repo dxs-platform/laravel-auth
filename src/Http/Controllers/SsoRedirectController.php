@@ -9,6 +9,7 @@ use Dxs\Auth\Services\OidcDiscovery;
 use Dxs\Auth\Support\Pkce;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 /**
@@ -24,9 +25,14 @@ final class SsoRedirectController
         $nonce = Str::random(40);
         $configuredOrganizationContextId = (string) config('sso.organization_context_id', '');
         $requestedOrganizationContextId = $request->query('organization_context_id');
-        $organizationContextId = $configuredOrganizationContextId !== ''
-            ? $configuredOrganizationContextId
-            : (is_string($requestedOrganizationContextId) ? $requestedOrganizationContextId : '');
+        $maySwitchOrganization = (bool) config('sso.allow_organization_switching', false)
+            && Auth::check()
+            && $requestedOrganizationContextId !== null;
+        $organizationContextId = $maySwitchOrganization
+            ? (is_string($requestedOrganizationContextId) ? $requestedOrganizationContextId : '')
+            : ($configuredOrganizationContextId !== ''
+                ? $configuredOrganizationContextId
+                : (is_string($requestedOrganizationContextId) ? $requestedOrganizationContextId : ''));
 
         if (! Str::isUuid($organizationContextId)) {
             throw new SsoConfigurationException('A valid organization context is required to start SSO.');

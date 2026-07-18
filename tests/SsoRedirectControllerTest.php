@@ -6,6 +6,7 @@ namespace Dxs\Auth\Tests;
 
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\SsoClientServiceProvider;
+use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -72,6 +73,48 @@ final class SsoRedirectControllerTest extends TestCase
         parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
 
         $this->assertSame(self::ORGANIZATION_CONTEXT_ID, $query['organization_context_id']);
+    }
+
+    public function test_an_authenticated_multi_tenant_consumer_can_reauthorize_for_a_selected_organization(): void
+    {
+        $selectedOrganization = '3efb1df0-1814-480c-9566-42d339758da8';
+        $this->app['config']->set('sso.organization_context_id', self::ORGANIZATION_CONTEXT_ID);
+        $this->app['config']->set('sso.allow_organization_switching', true);
+        $this->app['auth']->setUser(new GenericUser(['id' => 1]));
+
+        $response = $this->get('/auth/redirect?'.http_build_query([
+            'organization_context_id' => $selectedOrganization,
+            'return' => '/dashboard',
+        ]));
+        parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
+
+        $this->assertSame($selectedOrganization, $query['organization_context_id']);
+        $response->assertSessionHas("sso.transactions.{$query['state']}.organization_context_id", $selectedOrganization);
+        $response->assertSessionHas("sso.transactions.{$query['state']}.return", '/dashboard');
+    }
+
+    public function test_an_unauthenticated_request_cannot_override_a_fixed_context_even_when_switching_is_enabled(): void
+    {
+        $this->app['config']->set('sso.organization_context_id', self::ORGANIZATION_CONTEXT_ID);
+        $this->app['config']->set('sso.allow_organization_switching', true);
+
+        $response = $this->get('/auth/redirect?organization_context_id=3efb1df0-1814-480c-9566-42d339758da8');
+        parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
+
+        $this->assertSame(self::ORGANIZATION_CONTEXT_ID, $query['organization_context_id']);
+    }
+
+    public function test_a_malformed_authenticated_switch_context_never_falls_back_to_the_fixed_tenant(): void
+    {
+        $this->app['config']->set('sso.organization_context_id', self::ORGANIZATION_CONTEXT_ID);
+        $this->app['config']->set('sso.allow_organization_switching', true);
+        $this->app['auth']->setUser(new GenericUser(['id' => 1]));
+        $this->withoutExceptionHandling();
+
+        $this->expectException(SsoException::class);
+        $this->expectExceptionMessage('A valid organization context is required');
+
+        $this->get('/auth/redirect?organization_context_id=not-a-uuid');
     }
 
     #[DataProvider('invalidOrganizationContexts')]
