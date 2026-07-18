@@ -42,6 +42,10 @@ return [
      */
     'failure_redirect' => env('SSO_FAILURE_REDIRECT', ''),
 
+    // Optional query parameter used by a separately hosted frontend that
+    // cannot read Laravel session flash data (for example, a Next.js shell).
+    'failure_query_parameter' => env('SSO_FAILURE_QUERY_PARAMETER', ''),
+
     /*
      * Lifetime (seconds) of a pending authorization transaction — the window
      * between /auth/redirect and /auth/callback. Expired transactions are

@@ -7,6 +7,7 @@ namespace Dxs\Auth\Exceptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Uri;
 use RuntimeException;
 
 /**
@@ -22,6 +23,11 @@ class SsoException extends RuntimeException
     public function render(Request $request): RedirectResponse|bool
     {
         $target = (string) (config('sso.failure_redirect') ?: config('sso.after_logout') ?: '/');
+        $queryParameter = (string) config('sso.failure_query_parameter', '');
+
+        if ($queryParameter !== '') {
+            $target = (string) Uri::of($target)->withQuery([$queryParameter => $this->getMessage()]);
+        }
 
         return redirect()->to($target)->with('sso.error', $this->getMessage());
     }

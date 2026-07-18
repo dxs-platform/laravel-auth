@@ -110,6 +110,7 @@ SSO_AFTER_LOGIN=/dashboard
 SSO_AFTER_LOGOUT=/
 # optional: where failed logins land (falls back to SSO_AFTER_LOGOUT, then /)
 # SSO_FAILURE_REDIRECT=/login
+# SSO_FAILURE_QUERY_PARAMETER=error # for a separately hosted SPA/BFF frontend
 ```
 
 Why two organization values: the authorize request carries the **console**

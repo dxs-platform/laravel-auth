@@ -81,6 +81,19 @@ final class SsoFailureRenderingTest extends TestCase
             ->assertRedirect('/login?sso=failed');
     }
 
+    public function test_a_separately_hosted_frontend_can_receive_the_failure_message_in_the_query(): void
+    {
+        config()->set('sso.failure_redirect', 'https://consumer-a.example.test/login?redirect=%2Fhome');
+        config()->set('sso.failure_query_parameter', 'error');
+        Http::fake();
+
+        $response = $this->withSession($this->boundSession())
+            ->get('/auth/callback?error=access_denied&state=bound-state');
+
+        $response->assertRedirect('https://consumer-a.example.test/login?redirect=%2Fhome&error=SSO%20authorization%20was%20denied%20by%20the%20identity%20provider.');
+        $response->assertSessionHas('sso.error', 'SSO authorization was denied by the identity provider.');
+    }
+
     public function test_an_unreachable_idp_redirects_instead_of_crashing(): void
     {
         Http::fake([
