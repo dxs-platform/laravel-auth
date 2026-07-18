@@ -88,6 +88,21 @@ SSO_REDIRECT_URI=https://my-service.example/auth/callback
 # optional: SSO_SCOPES, SSO_ROUTES_PREFIX, SSO_TOKEN_COOKIE, SSO_AFTER_LOGIN, ...
 ```
 
+Development bearer bypass is disabled and deny-all by default. If a local test
+suite genuinely needs it, enable it only in `local,testing` and bind
+`Dxs\Auth\Contracts\ValidatesDevelopmentSubjects` to an application policy:
+
+```dotenv
+SSO_DEV_BYPASS=true
+SSO_DEV_BYPASS_ENVIRONMENTS=local,testing
+SSO_DEV_BYPASS_PREFIX=dev:
+# Static alternative to a binding; use stable subject IDs, never emails.
+SSO_DEV_BYPASS_SUBJECTS=test-subject-1,test-subject-2
+```
+
+The package still rejects the bypass in staging/production and never accepts an
+unapproved subject. Do not enable it on an externally reachable environment.
+
 For a multi-tenant downstream, the platform launcher supplies
 `organization_context_id` on the downstream URL. The package validates, stores,
 and relays that context to the IdP authorization endpoint.

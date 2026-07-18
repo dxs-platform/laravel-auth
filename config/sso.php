@@ -135,6 +135,24 @@ return [
     'token_cookie' => env('SSO_TOKEN_COOKIE', 'token'),
 
     /*
+     * Explicit local/test escape hatch. Disabled and subject-denying by
+     * default; staging/production are excluded even if the flag is enabled.
+     * Bind ValidatesDevelopmentSubjects for a dynamic consumer policy.
+     */
+    'dev_bypass' => [
+        'enabled' => (bool) env('SSO_DEV_BYPASS', false),
+        'environments' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('SSO_DEV_BYPASS_ENVIRONMENTS', 'local,testing')),
+        ))),
+        'token_prefix' => env('SSO_DEV_BYPASS_PREFIX', 'dev:'),
+        'subjects' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('SSO_DEV_BYPASS_SUBJECTS', '')),
+        ))),
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | Route registration
     |--------------------------------------------------------------------------

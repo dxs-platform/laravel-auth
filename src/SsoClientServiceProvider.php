@@ -7,6 +7,7 @@ namespace Dxs\Auth;
 use Dxs\Auth\Console\InstallCommand;
 use Dxs\Auth\Console\SyncAuthzCommand;
 use Dxs\Auth\Contracts\ProvisionsUsers;
+use Dxs\Auth\Contracts\ValidatesDevelopmentSubjects;
 use Dxs\Auth\Http\Middleware\AuthenticateSso;
 use Dxs\Auth\Http\Middleware\AuthorizeSsoPermission;
 use Dxs\Auth\Provisioning\DatabaseUserProvisioner;
@@ -17,6 +18,7 @@ use Dxs\Auth\Services\PermissionClient;
 use Dxs\Auth\Services\PlatformContextClient;
 use Dxs\Auth\Services\TokenExchanger;
 use Dxs\Auth\Services\TokenRefresher;
+use Dxs\Auth\Support\ConfigDevelopmentSubjectValidator;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
@@ -32,6 +34,7 @@ final class SsoClientServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/authz.php', 'authz');
 
         $this->app->singletonIf(ProvisionsUsers::class, DatabaseUserProvisioner::class);
+        $this->app->singletonIf(ValidatesDevelopmentSubjects::class, ConfigDevelopmentSubjectValidator::class);
         $this->app->singleton(OidcDiscovery::class);
         $this->app->singleton(JwtVerifier::class);
         $this->app->singleton(LogoutSessionRegistry::class);

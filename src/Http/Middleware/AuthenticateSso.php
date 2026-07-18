@@ -6,6 +6,7 @@ namespace Dxs\Auth\Http\Middleware;
 
 use Closure;
 use Dxs\Auth\Contracts\ProvisionsUsers;
+use Dxs\Auth\Contracts\ValidatesDevelopmentSubjects;
 use Dxs\Auth\Exceptions\SsoException;
 use Dxs\Auth\Services\JwtVerifier;
 use Dxs\Auth\Services\LogoutSessionRegistry;
@@ -26,15 +27,14 @@ final class AuthenticateSso
         private readonly JwtVerifier $verifier,
         private readonly ProvisionsUsers $provisioner,
         private readonly LogoutSessionRegistry $logoutSessions,
+        private readonly ValidatesDevelopmentSubjects $developmentSubjects,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->bearerToken();
 
-        // Dev/test escape hatches — mirror the gateway middleware this replaces.
-        // NEVER active in production (real JWKS-verified bearer only there).
-        if (app()->environment() !== 'production') {
+        if ($this->developmentBypassEnabled()) {
             // 1. Honour an already-authenticated user only when the request has
             //    no bearer. An explicit bearer must remain authoritative and
             //    must not force custom-provisioner consumers to resolve the
@@ -43,12 +43,11 @@ final class AuthenticateSso
                 return $next($request);
             }
 
-            // 2. Accept a `Bearer dev:<subject>` token → resolve/JIT-provision the
-            //    local user for that subject with no network round-trip.
-            if (is_string($token) && str_starts_with($token, 'dev:')) {
-                $subject = substr($token, 4);
+            $prefix = (string) config('sso.dev_bypass.token_prefix', 'dev:');
+            if ($prefix !== '' && is_string($token) && str_starts_with($token, $prefix)) {
+                $subject = substr($token, strlen($prefix));
 
-                if ($subject !== '') {
+                if ($subject !== '' && $this->developmentSubjects->allows($subject)) {
                     $user = $this->provisioner->resolveBySubject($subject)
                         ?? $this->provisioner->provision(['sub' => $subject], ['access_token' => $token]);
 
@@ -85,6 +84,12 @@ final class AuthenticateSso
         $request->attributes->set('sso_subject', $subject);
 
         return $next($request);
+    }
+
+    private function developmentBypassEnabled(): bool
+    {
+        return (bool) config('sso.dev_bypass.enabled', false)
+            && app()->environment((array) config('sso.dev_bypass.environments', ['local', 'testing']));
     }
 
     private function unauthenticated(Request $request): Response

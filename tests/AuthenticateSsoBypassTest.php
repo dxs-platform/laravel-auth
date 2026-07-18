@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dxs\Auth\Tests;
 
 use Dxs\Auth\Contracts\ProvisionsUsers;
+use Dxs\Auth\Contracts\ValidatesDevelopmentSubjects;
 use Dxs\Auth\SsoClientServiceProvider;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -31,8 +32,11 @@ final class AuthenticateSsoBypassTest extends TestCase
         $app['config']->set('sso.issuer', 'https://platform.example');
         $app['config']->set('sso.service_slug', 'kintai');
         $app['config']->set('sso.routes.enabled', false);
+        $app['config']->set('sso.dev_bypass.enabled', true);
+        $app['config']->set('sso.dev_bypass.environments', ['local', 'testing']);
 
         $app->instance(ProvisionsUsers::class, new BypassProvisioner);
+        $app->instance(ValidatesDevelopmentSubjects::class, new AllowPerson42);
     }
 
     protected function defineRoutes($router): void
@@ -78,6 +82,38 @@ final class AuthenticateSsoBypassTest extends TestCase
 
         $this->getJson('/protected', ['Authorization' => 'Bearer dev:person-42'])
             ->assertUnauthorized();
+    }
+
+    public function test_all_bypasses_are_disabled_without_explicit_opt_in(): void
+    {
+        $this->app['config']->set('sso.dev_bypass.enabled', false);
+        $user = new GenericUser(['id' => 1, 'name' => 'Local Tester']);
+
+        $this->actingAs($user)->getJson('/protected')->assertUnauthorized();
+        $this->getJson('/protected', ['Authorization' => 'Bearer dev:person-42'])
+            ->assertUnauthorized();
+    }
+
+    public function test_dev_subject_bearer_is_rejected_in_staging(): void
+    {
+        $this->app['env'] = 'staging';
+
+        $this->getJson('/protected', ['Authorization' => 'Bearer dev:person-42'])
+            ->assertUnauthorized();
+    }
+
+    public function test_unapproved_dev_subject_is_rejected_without_provisioning(): void
+    {
+        $this->getJson('/protected', ['Authorization' => 'Bearer dev:attacker'])
+            ->assertUnauthorized();
+    }
+}
+
+final class AllowPerson42 implements ValidatesDevelopmentSubjects
+{
+    public function allows(string $subject): bool
+    {
+        return $subject === 'person-42';
     }
 }
 
