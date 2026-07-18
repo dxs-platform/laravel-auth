@@ -116,6 +116,14 @@ final class SsoManager
         return $context === null ? [] : $this->platformContext->brands($context['token'], $organizationSlug);
     }
 
+    /** @return array<string, mixed> */
+    public function teams(string $organizationSlug): array
+    {
+        $context = $this->context();
+
+        return $context === null ? [] : $this->platformContext->teams($context['token'], $organizationSlug);
+    }
+
     /** True when the current user holds the given platform permission. */
     public function can(string $ability): bool
     {

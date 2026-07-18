@@ -108,6 +108,7 @@ return [
         'access' => env('SSO_ACCESS_PATH', 'api/sso/access'),
         'branches' => env('SSO_BRANCHES_PATH', 'api/sso/branches'),
         'brands' => env('SSO_BRANDS_PATH', 'api/sso/brands'),
+        'teams' => env('SSO_TEAMS_PATH', 'api/sso/teams'),
     ],
 
     /*

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static array organizationAccess(string $organizationSlug)
  * @method static array branches(string $organizationSlug)
  * @method static array brands(string $organizationSlug)
+ * @method static array teams(string $organizationSlug)
  * @method static bool can(string $ability)
  * @method static bool canAll(string ...$abilities)
  * @method static bool canAny(string ...$abilities)

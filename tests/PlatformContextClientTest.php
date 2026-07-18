@@ -34,6 +34,7 @@ final class PlatformContextClientTest extends TestCase
             'https://id.example.test/api/sso/access*' => Http::response(['service_role' => 'admin']),
             'https://id.example.test/api/sso/branches*' => Http::response(['branches' => [['id' => 'branch-1']]]),
             'https://id.example.test/api/sso/brands*' => Http::response(['brands' => [['brand_id' => 'brand-1']]]),
+            'https://id.example.test/api/sso/teams*' => Http::response(['teams' => [['id' => 'team-1']]]),
         ]);
 
         $client = $this->app->make(PlatformContextClient::class);
@@ -42,6 +43,7 @@ final class PlatformContextClientTest extends TestCase
         $this->assertSame('admin', $client->access('secret-token', 'acme')['service_role']);
         $this->assertSame('branch-1', $client->branches('secret-token', 'acme')['branches'][0]['id']);
         $this->assertSame('brand-1', $client->brands('secret-token', 'acme')['brands'][0]['brand_id']);
+        $this->assertSame('team-1', $client->teams('secret-token', 'acme')['teams'][0]['id']);
 
         Http::assertSent(function (Request $request): bool {
             if (! $request->hasHeader('Authorization', 'Bearer secret-token')) {
@@ -51,7 +53,7 @@ final class PlatformContextClientTest extends TestCase
             return ! str_contains($request->url(), 'organization_slug=')
                 || str_contains($request->url(), 'organization_slug=acme');
         });
-        Http::assertSentCount(4);
+        Http::assertSentCount(5);
     }
 
     public function test_it_rejects_denied_and_malformed_context_responses_without_echoing_secrets(): void

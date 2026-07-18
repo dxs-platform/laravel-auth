@@ -106,6 +106,7 @@ final class SsoManagerAndEventsTest extends TestCase
             'https://id.example.test/api/sso/access*' => Http::response(['service_role' => 'manager']),
             'https://id.example.test/api/sso/branches*' => Http::response(['branches' => [['id' => 'branch-1']]]),
             'https://id.example.test/api/sso/brands*' => Http::response(['brands' => [['brand_id' => 'brand-1']]]),
+            'https://id.example.test/api/sso/teams*' => Http::response(['teams' => [['id' => 'team-1']]]),
         ]);
 
         Auth::setUser(new GenericUser([
@@ -119,6 +120,7 @@ final class SsoManagerAndEventsTest extends TestCase
         $this->assertSame('manager', Sso::organizationAccess('acme')['service_role']);
         $this->assertSame('branch-1', Sso::branches('acme')['branches'][0]['id']);
         $this->assertSame('brand-1', Sso::brands('acme')['brands'][0]['brand_id']);
+        $this->assertSame('team-1', Sso::teams('acme')['teams'][0]['id']);
     }
 
     public function test_the_facade_reuses_the_gate_permission_cache_no_extra_platform_calls(): void

@@ -43,6 +43,12 @@ final class PlatformContextClient
         return $this->get($accessToken, 'brands', ['organization_slug' => $organizationSlug]);
     }
 
+    /** @return array<string, mixed> */
+    public function teams(string $accessToken, string $organizationSlug): array
+    {
+        return $this->get($accessToken, 'teams', ['organization_slug' => $organizationSlug]);
+    }
+
     /**
      * @param  array<string, scalar|null>  $query
      * @return array<string, mixed>
