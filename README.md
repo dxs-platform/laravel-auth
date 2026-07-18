@@ -12,7 +12,7 @@ permission list and answers `Gate` from it. The service only declares its permis
 ## Install
 
 ```bash
-composer require dxs/laravel-auth:^0.8
+composer require dxs/laravel-auth:^0.12
 php artisan sso:install   # publishes config + users-table migration + authz catalog
 php artisan migrate
 ```

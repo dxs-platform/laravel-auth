@@ -23,12 +23,12 @@ Time budget: ~30 minutes when nothing surprises you.
 ```
 
 ```bash
-composer require "dxs/laravel-auth:^0.4.0"
+composer require "dxs/laravel-auth:^0.12"
 ```
 
-v0.4.0 is the minimum version that works against the current platform IdP —
-older versions reject its `organization_id` token claim and drop ID-token
-profile claims (issues #4, #5).
+v0.12.0 is the minimum version for authenticated organization switching and
+the current downstream context contract. Older releases do not include the
+multi-organization reauthorization and context hardening documented here.
 
 ## Step 1 — Register the service + instance on the platform
 
