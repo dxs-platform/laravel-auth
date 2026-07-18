@@ -10,6 +10,7 @@ use Dxs\Auth\SsoClientServiceProvider;
 use Dxs\Auth\Tests\Support\JwtFactory;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase;
@@ -73,6 +74,20 @@ final class AuthenticateSsoMiddlewareTest extends TestCase
             ->assertJsonPath('claims.sub', 'user-1')
             ->assertJsonPath('user', 'user-1');
         $this->assertSame(1, $this->provisioner->provisionCalls);
+    }
+
+    public function test_a_valid_bearer_does_not_resolve_the_session_provider_first(): void
+    {
+        Auth::shouldReceive('check')->never();
+        Auth::shouldReceive('setUser')->once()->withArgs(
+            fn (Authenticatable $user): bool => $user->getAuthIdentifier() === 'user-1',
+        );
+
+        $this->withToken($this->jwt->token())
+            ->getJson('/protected')
+            ->assertSuccessful()
+            ->assertJsonPath('subject', 'user-1')
+            ->assertJsonPath('user', 'user-1');
     }
 
     public function test_it_reuses_an_existing_local_user_without_reprovisioning(): void

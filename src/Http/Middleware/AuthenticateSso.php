@@ -35,9 +35,11 @@ final class AuthenticateSso
         // Dev/test escape hatches — mirror the gateway middleware this replaces.
         // NEVER active in production (real JWKS-verified bearer only there).
         if (app()->environment() !== 'production') {
-            // 1. Honour an already-authenticated user (e.g. feature tests using
-            //    Laravel's actingAs() / any prior guard-resolved session user).
-            if (Auth::check()) {
+            // 1. Honour an already-authenticated user only when the request has
+            //    no bearer. An explicit bearer must remain authoritative and
+            //    must not force custom-provisioner consumers to resolve the
+            //    default session provider first.
+            if ((! is_string($token) || $token === '') && Auth::check()) {
                 return $next($request);
             }
 
