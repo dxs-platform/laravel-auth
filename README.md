@@ -92,6 +92,17 @@ For a multi-tenant downstream, the platform launcher supplies
 `organization_context_id` on the downstream URL. The package validates, stores,
 and relays that context to the IdP authorization endpoint.
 
+Set `SSO_ALLOW_ORGANIZATION_SWITCHING=true` only when an authenticated user may
+select another organization. Reauthorization must still run through
+`GET /auth/redirect`; never update the local organization context directly.
+
+> **Inertia consumers:** a downstream endpoint that returns
+> `Inertia::location(route('sso.redirect', ...))` intentionally responds with
+> `409 Conflict` and an `X-Inertia-Location` header. The Inertia client converts
+> that protocol response into a full-page OIDC navigation. The package's own
+> `/auth/redirect` route then responds with the normal `302` redirect to the
+> IdP. See [organization switching and Inertia's expected 409](docs/onboarding.md#organization-switching-from-an-inertia-app).
+
 ## Wire the one app-specific touch-point
 
 The package never writes your `User` model. Bind the `ProvisionsUsers` contract to your own
