@@ -102,7 +102,12 @@ export async function startFakeIdp() {
       if (url.searchParams.get('organization_id') !== claims.organization_context_id) {
         return sendJson(response, 403, { code: 'CONTEXT_UNAVAILABLE' });
       }
-      return sendJson(response, 200, { permissions: [`${claims.aud}.dashboard.view`], roles: ['member'], service_access: true, authoritative: true });
+      return sendJson(response, 200, {
+        permissions: [`${claims.aud}.dashboard.view`],
+        roles: ['member'],
+        service_access: { [claims.aud]: { enabled: true } },
+        authoritative: true,
+      });
     }
     response.writeHead(404).end();
   });

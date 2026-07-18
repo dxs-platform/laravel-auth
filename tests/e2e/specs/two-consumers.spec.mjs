@@ -92,11 +92,13 @@ test('wrong state, callback replay, and organization-claim substitution fail clo
   const callback = responses.at(-1);
   expect(callback).toBeTruthy();
   const replay = await page.goto(callback);
-  expect(replay.status()).toBe(500);
+  expect(replay.status()).toBe(200);
+  await expect(page).toHaveURL('http://downstream-a.localhost:9401/sso-failed');
   await expect(page.getByText(/state mismatch/i)).toBeVisible();
 
   const wrongState = await page.goto('http://downstream-a.localhost:9401/auth/callback?code=unused&state=wrong');
-  expect(wrongState.status()).toBe(500);
+  expect(wrongState.status()).toBe(200);
+  await expect(page).toHaveURL('http://downstream-a.localhost:9401/sso-failed');
   await expect(page.getByText(/state mismatch/i)).toBeVisible();
 
   await page.goto('http://downstream-a.localhost:9401');
@@ -105,7 +107,8 @@ test('wrong state, callback replay, and organization-claim substitution fail clo
     page.waitForResponse((response) => response.url().includes('/auth/callback')),
     page.getByRole('button', { name: 'Tamper organization claim' }).click(),
   ]);
-  expect(tampered[0].status()).toBe(500);
+  expect(tampered[0].status()).toBe(302);
+  await expect(page).toHaveURL('http://downstream-a.localhost:9401/sso-failed');
   await expect(page.getByText(/organization context (does not match|mismatch)/i)).toBeVisible();
 });
 

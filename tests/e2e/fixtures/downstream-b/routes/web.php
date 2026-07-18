@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 $organization = '3efb1df0-1814-480c-9566-42d339758da8';
 
 Route::get('/', fn () => response('<!doctype html><title>Consumer B</title><a href="/auth/redirect?organization_context_id='.$organization.'&return=%2Fprotected">Start SSO login</a>'));
+Route::get('/sso-failed', fn () => response('<!doctype html><title>SSO failed</title><p data-testid="sso-error">'.e((string) session('sso.error')).'</p>'));
 Route::get('/protected', function (Request $request) {
     $claims = $request->attributes->get('sso_claims');
 
