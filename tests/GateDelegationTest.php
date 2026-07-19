@@ -132,4 +132,5 @@ final class GateDelegationTest extends TestCase
 
         $this->assertFalse(Gate::forUser($this->platformUser())->allows('dashboard.view'));
     }
+
 }

@@ -101,36 +101,38 @@ final class SsoClientServiceProvider extends ServiceProvider
         // Authorization DECISIONS stay on the platform: a granted ability is one
         // present in the user's platform-resolved permission list. Explicit
         // policies still run for abilities not in the list (Gate::before → null).
-        Gate::before(function (Authenticatable $user, string $ability): ?bool {
-            $platformAbilities = collect((array) config('authz.permissions'))
-                ->pluck('slug')
-                ->filter(fn (mixed $slug): bool => is_string($slug) && $slug !== '');
+        if ((bool) config('sso.permissions.gate_enabled', true)) {
+            Gate::before(function (Authenticatable $user, string $ability): ?bool {
+                $platformAbilities = collect((array) config('authz.permissions'))
+                    ->pluck('slug')
+                    ->filter(fn (mixed $slug): bool => is_string($slug) && $slug !== '');
 
-            if (! $platformAbilities->contains($ability)) {
-                return null;
-            }
+                if (! $platformAbilities->contains($ability)) {
+                    return null;
+                }
 
-            $token = data_get($user, 'console_access_token');
-            $org = data_get($user, 'console_organization_id');
+                $token = data_get($user, 'console_access_token');
+                $org = data_get($user, 'console_organization_id');
 
-            if (! is_string($token) || $token === '' || ! is_string($org) || $org === '') {
-                return false;
-            }
+                if (! is_string($token) || $token === '' || ! is_string($org) || $org === '') {
+                    return false;
+                }
 
-            $this->app->make(TokenRefresher::class)->ensureFresh($user);
-            $token = data_get($user, 'console_access_token');
-            if (! is_string($token) || $token === '') {
-                return false;
-            }
+                $this->app->make(TokenRefresher::class)->ensureFresh($user);
+                $token = data_get($user, 'console_access_token');
+                if (! is_string($token) || $token === '') {
+                    return false;
+                }
 
-            $branch = data_get($user, 'console_branch_id');
-            $branch = is_string($branch) && $branch !== '' ? $branch : null;
+                $branch = data_get($user, 'console_branch_id');
+                $branch = is_string($branch) && $branch !== '' ? $branch : null;
 
-            $decision = $this->app->make(PermissionClient::class)
-                ->resolveFor($token, $org, $branch);
+                $decision = $this->app->make(PermissionClient::class)
+                    ->resolveFor($token, $org, $branch);
 
-            return $decision['authoritative'] && $decision['permissions']->contains($ability);
-        });
+                return $decision['authoritative'] && $decision['permissions']->contains($ability);
+            });
+        }
 
         // Guests bounced by Laravel's `auth` middleware land on route('login');
         // register the SSO fallback unless the app defines its own.

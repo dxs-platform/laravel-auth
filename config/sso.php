@@ -176,6 +176,11 @@ return [
      */
     'permissions' => [
         'strict' => (bool) env('SSO_PERMISSIONS_STRICT', false),
+        // Consumers with their own authoritative Gate::before resolver can
+        // disable the package callback without hiding config/authz.php from
+        // catalog sync. This avoids callback-ordering vetoes between two
+        // independent authorization backends.
+        'gate_enabled' => (bool) env('SSO_PERMISSIONS_GATE_ENABLED', true),
     ],
 
     /*
