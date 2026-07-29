@@ -1,0 +1,11 @@
+# Bảng nối role ↔ permission. Cặp là duy nhất; xoá role hoặc permission thì
+# hàng nối đi theo (CASCADE).
+kind: pivot
+pivotFor: [Role, Permission]
+
+options:
+  timestamps: true
+  indexes:
+    - columns: [role_id, permission_id]
+      unique: true
+      name: role_permissions_role_permission_unique

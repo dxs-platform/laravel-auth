@@ -56,6 +56,15 @@ final class SsoClientServiceProvider extends ServiceProvider
             __DIR__.'/../database/migrations/add_sso_identity_columns_to_users_table.php.stub' => database_path('migrations/'.date('Y_m_d_His').'_add_sso_identity_columns_to_users_table.php'),
         ], 'sso-migrations');
 
+        // Schema Omnify của các bảng do package định nghĩa. Consumer publish
+        // một lần rồi sở hữu bản copy — thêm cột riêng thoải mái. Cố ý KHÔNG
+        // đọc thẳng từ vendor: schema phải là file dự án tự quản, và cách này
+        // tránh phải dùng `kind: extend` (omnify bỏ qua property khai trên stub
+        // extend, nên cột thêm vào sẽ lặng lẽ không bao giờ được sinh ra).
+        $this->publishes([
+            __DIR__.'/../schemas' => (string) config('sso.schemas_path', base_path('schemas/Sso')),
+        ], 'sso-schemas');
+
         $this->publishes([
             __DIR__.'/../stubs/authz.php.stub' => config_path('authz.php'),
         ], 'sso-authz');
