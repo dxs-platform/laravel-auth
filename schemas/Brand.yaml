@@ -1,0 +1,148 @@
+# Thương hiệu thuộc một tenant. Giữ cả cấu hình Reverb riêng cho từng brand nên
+# một brand bị lộ khoá không kéo theo brand khác.
+kind: object
+
+options:
+  id: Uuid
+  timestamps: true
+  softDelete: true
+  indexes:
+    - columns: [console_organization_id]
+    - columns: [console_organization_id, slug]
+      unique: true
+    - columns: [console_organization_id, is_active]
+
+properties:
+  console_brand_id:
+    type: Uuid
+    unique: true
+    displayName:
+      ja: コンソールブランドID
+      en: Console Brand ID
+      vi: ID thương hiệu trên Console
+
+  console_organization_id:
+    type: Uuid
+    displayName:
+      ja: コンソール組織ID
+      en: Console Organization ID
+      vi: ID tổ chức trên Console
+
+  name:
+    type: String
+    length: 255
+    displayName:
+      ja: ブランド名
+      en: Brand Name
+      vi: Tên thương hiệu
+
+  slug:
+    type: String
+    length: 100
+    displayName:
+      ja: スラッグ
+      en: Slug
+      vi: Slug
+
+  description:
+    type: Text
+    nullable: true
+    displayName:
+      ja: 説明
+      en: Description
+      vi: Mô tả
+
+  logo_url:
+    type: String
+    length: 500
+    nullable: true
+    displayName:
+      ja: ロゴURL
+      en: Logo URL
+      vi: URL logo
+
+  is_active:
+    type: Boolean
+    default: true
+    displayName:
+      ja: 有効
+      en: Active
+      vi: Hoạt động
+
+  primary_color:
+    type: String
+    length: 7
+    nullable: true
+    displayName:
+      ja: プライマリカラー
+      en: Primary Color
+      vi: Màu chính
+
+  secondary_color:
+    type: String
+    length: 7
+    nullable: true
+    displayName:
+      ja: セカンダリカラー
+      en: Secondary Color
+      vi: Màu phụ
+
+  accent_color:
+    type: String
+    length: 7
+    nullable: true
+    displayName:
+      ja: アクセントカラー
+      en: Accent Color
+      vi: Màu nhấn
+
+  text_color:
+    type: String
+    length: 7
+    nullable: true
+    displayName:
+      ja: テキストカラー
+      en: Text Color
+      vi: Màu chữ
+
+  reverb_app_id:
+    type: String
+    length: 64
+    nullable: true
+    displayName:
+      ja: Reverb App ID
+      en: Reverb App ID
+      vi: Reverb App ID
+
+  reverb_app_key:
+    type: String
+    length: 64
+    nullable: true
+    displayName:
+      ja: Reverb App Key
+      en: Reverb App Key
+      vi: Reverb App Key
+
+  reverb_app_secret:
+    type: Text
+    nullable: true
+    displayName:
+      ja: Reverb App Secret
+      en: Reverb App Secret
+      vi: Reverb App Secret
+
+  reverb_allowed_origins:
+    type: Json
+    nullable: true
+    displayName:
+      ja: Reverb 許可オリジン
+      en: Reverb Allowed Origins
+      vi: Origin cho phép của Reverb
+
+  reverb_provisioned_at:
+    type: DateTime
+    nullable: true
+    displayName:
+      ja: Reverb 発行日時
+      en: Reverb Provisioned At
+      vi: Thời điểm cấp Reverb

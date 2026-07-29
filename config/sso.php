@@ -198,6 +198,11 @@ return [
         'model' => env('SSO_PROVISIONER_MODEL'),
     ],
 
+    // Đích publish của các schema Omnify đi kèm package (tag `sso-schemas`).
+    // Mặc định trỏ vào `schemas/Sso` trong app. Monorepo đặt tập schema ngoài
+    // thư mục Laravel thì trỏ lại bằng SSO_SCHEMAS_PATH.
+    'schemas_path' => env('SSO_SCHEMAS_PATH', base_path('schemas/Sso')),
+
     'routes' => [
         'enabled' => env('SSO_ROUTES_ENABLED', true),
         'prefix' => env('SSO_ROUTES_PREFIX', 'auth'),
